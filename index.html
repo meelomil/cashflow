@@ -1,0 +1,2460 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Kantong Keuangan</title>
+</head>
+<body style="margin:0;padding:0;">
+<div id="app-root"></div>
+<div id="rab-print-area"></div>
+<style>
+  html, body { margin: 0; padding: 0; background: #FBF8F1; }
+  #app-root {
+    --paper: #FBF8F1;
+    --ink: #1B2E28;
+    --ink-soft: #4A5A54;
+    --forest: #1B4332;
+    --forest-deep: #0F2A22;
+    --gold: #B8862E;
+    --gold-soft: #E4CFA0;
+    --brick: #A8443E;
+    --sage: #4C7A5B;
+    --line: #D8CFB8;
+    --card: #FFFDF8;
+
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    min-height: 100vh;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  #app-root * { box-sizing: border-box; }
+  .num { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  .header { background: var(--forest); color: var(--paper); padding: 28px 24px 60px; position: relative; overflow: hidden; }
+  .header::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px; background: var(--paper);
+    clip-path: polygon(0 100%, 100% 100%, 100% 0, 97% 100%, 94% 0, 91% 100%, 88% 0, 85% 100%, 82% 0, 79% 100%, 76% 0, 73% 100%, 70% 0, 67% 100%, 64% 0, 61% 100%, 58% 0, 55% 100%, 52% 0, 49% 100%, 46% 0, 43% 100%, 40% 0, 37% 100%, 34% 0, 31% 100%, 28% 0, 25% 100%, 22% 0, 19% 100%, 16% 0, 13% 100%, 10% 0, 7% 100%, 4% 0, 1% 100%, 0 0);
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; max-width: 960px; margin: 0 auto; flex-wrap: wrap; }
+  .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-soft); margin: 0 0 4px; }
+  .title { font-family: Georgia, 'Times New Roman', serif; font-size: 26px; margin: 0; font-weight: 600; }
+  .subtitle { color: #C9D6CC; font-size: 13px; margin: 6px 0 0; max-width: 50ch; line-height: 1.5; }
+  .income-box { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 12px 16px; text-align: right; min-width: 200px; }
+  .income-box label { display: block; font-size: 11px; color: var(--gold-soft); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .income-box input#income-input { background: transparent; border: none; color: #fff; font-size: 22px; text-align: right; width: 100%; font-family: 'IBM Plex Mono', monospace; outline: none; margin-bottom: 4px; }
+  .income-extra-list { list-style: none; margin: 6px 0; padding: 0; text-align: left; }
+  .income-extra-list li { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #E4E9E6; padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,0.15); gap: 6px; }
+  .income-extra-list li button { border: none; background: none; color: #E8A9A5; cursor: pointer; font-size: 12px; opacity: 0.7; }
+  .income-extra-list li button:hover { opacity: 1; }
+  .income-add-toggle {
+    background: none; border: 1px dashed rgba(255,255,255,0.3); color: var(--gold-soft); font-size: 11px;
+    padding: 4px 10px; border-radius: 6px; cursor: pointer; margin-top: 4px;
+  }
+  .income-add-toggle:hover { border-color: var(--gold-soft); }
+  .income-add-form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .income-add-form input { border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.08); color: #fff; border-radius: 6px; padding: 6px 8px; font-size: 12px; font-family: inherit; text-align: left; }
+  .income-add-form input::placeholder { color: rgba(255,255,255,0.5); }
+  .income-add-form button { border: none; background: var(--gold); color: #fff; border-radius: 6px; padding: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .income-total-row { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 13px; font-weight: 700; color: #fff; display: flex; justify-content: space-between; gap: 10px; }
+
+  .content { max-width: 960px; margin: -30px auto 0; padding: 0 24px 60px; position: relative; z-index: 2; }
+
+  .summary-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 700px) { .summary-strip { grid-template-columns: 1fr; } }
+  .summary-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .summary-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); margin-bottom: 6px; }
+  .summary-card .value { font-size: 19px; font-weight: 600; }
+  .summary-card .value.warn { color: var(--brick); }
+  .summary-card .value.ok { color: var(--sage); }
+
+  .flow-note {
+    background: #F3EEDD; border: 1px solid var(--gold-soft); border-radius: 8px;
+    padding: 10px 14px; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 24px; line-height: 1.6;
+  }
+  .flow-note b { color: var(--ink); }
+
+  .stairs { display: flex; flex-direction: column; gap: 16px; margin-bottom: 28px; }
+
+  .envelope { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; }
+  .step-badge {
+    width: 44px; flex-shrink: 0; background: var(--step-color, var(--forest)); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-family: Georgia, serif;
+    font-size: 20px; font-weight: 700;
+  }
+  .envelope-body { padding: 14px 16px 16px; flex: 1; min-width: 0; }
+  .envelope-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+  .envelope-name { font-weight: 600; font-size: 15px; margin: 0 0 2px; }
+  .envelope-desc { font-size: 11.5px; color: var(--ink-soft); margin: 0; }
+  .pct-input { width: 40px; border: none; background: transparent; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); border-bottom: 1px dotted var(--line); text-align: center; }
+  .pct-editable { font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; }
+  .pct-nominal { display: block; text-align: right; font-size: 11px; color: var(--gold); margin-top: 2px; }
+
+  .achieved-banner {
+    background: #E7F0EA; border: 1px solid var(--sage); color: #2F5A40; font-size: 12px;
+    border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; font-weight: 500;
+  }
+
+  .env-bar-track { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+  .env-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+  .env-numbers { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 10px; }
+  .env-numbers .spent { font-weight: 600; }
+  .env-numbers .target { color: var(--ink-soft); }
+
+  .tx-list { list-style: none; margin: 0 0 8px; padding: 0; max-height: 110px; overflow-y: auto; }
+  .tx-list li { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding: 5px 0; border-bottom: 1px dashed var(--line); gap: 8px; }
+  .tx-list li .note { color: var(--ink-soft); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tx-list li .amt { font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+  .tx-list li .amt.out { color: var(--brick); }
+  .tx-date-badge { font-size: 10.5px; color: var(--ink-soft); background: var(--paper); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; }
+  .add-tx input.tx-date { font-size: 11.5px; color: var(--ink-soft); width: 118px; }
+  .tx-list li button { border: none; background: none; color: var(--brick); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; opacity: 0.5; }
+  .tx-list li button:hover { opacity: 1; }
+  .tx-empty { font-size: 12px; color: var(--ink-soft); font-style: italic; padding: 6px 0; }
+
+  .add-tx { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .add-tx input, .add-tx select { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 12.5px; font-family: inherit; }
+  .add-tx input.note { flex: 1; min-width: 90px; }
+  .add-tx input.amount { width: 90px; font-family: 'IBM Plex Mono', monospace; }
+  .add-tx button { border: none; background: var(--forest); color: #fff; border-radius: 6px; padding: 0 12px; font-size: 13px; cursor: pointer; font-weight: 600; }
+  .add-tx button:hover { background: var(--forest-deep); }
+  .add-tx button.ghost { background: transparent; color: var(--brick); border: 1px solid var(--brick); }
+
+  .goal-row { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; background: #FEFDF9; }
+  .goal-row-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .goal-row-head .name { font-weight: 600; font-size: 13.5px; }
+  .goal-row-head button { border: none; background: none; color: var(--brick); cursor: pointer; opacity: 0.5; font-size: 13px; }
+  .goal-row-head button:hover { opacity: 1; }
+
+  .instrument-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .chip { font-size: 11px; padding: 3px 9px; border-radius: 20px; background: var(--gold-soft); color: #6B4E17; font-weight: 600; }
+
+  .add-goal-btn, .add-pocket-btn {
+    display: inline-block; background: none; border: 1px dashed var(--line); color: var(--ink-soft);
+    border-radius: 6px; padding: 7px 12px; font-size: 12.5px; cursor: pointer; margin-top: 4px;
+  }
+  .add-goal-btn:hover, .add-pocket-btn:hover { border-color: var(--forest); color: var(--forest); }
+
+  .utang-note { font-size: 11px; color: var(--ink-soft); margin-top: 6px; line-height: 1.5; }
+
+  .calc-toggle {
+    background: none; border: 1px dashed var(--line); color: var(--ink-soft); font-size: 11.5px;
+    padding: 5px 10px; border-radius: 6px; cursor: pointer; margin: 2px 0 10px; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .calc-toggle:hover { border-color: var(--forest); color: var(--forest); }
+  .calc-panel { background: #F3EEDD; border: 1px solid var(--gold-soft); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  .calc-rows { list-style: none; margin: 0 0 8px; padding: 0; }
+  .calc-rows li { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding: 4px 0; border-bottom: 1px dashed var(--gold-soft); gap: 8px; }
+  .calc-rows li .desc { color: var(--ink-soft); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .calc-rows li .subtotal { font-family: 'IBM Plex Mono', monospace; white-space: nowrap; font-weight: 600; }
+  .calc-rows li button { border: none; background: none; color: var(--brick); cursor: pointer; font-size: 13px; opacity: 0.5; }
+  .calc-rows li button:hover { opacity: 1; }
+  .calc-rows li button.record-btn { color: var(--forest); }
+  .calc-record-all-btn {
+    border: 1px solid var(--forest); background: transparent; color: var(--forest); border-radius: 6px;
+    padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: 600; width: 100%; margin-bottom: 8px;
+  }
+  .calc-record-all-btn:hover { background: var(--forest); color: #fff; }
+  .calc-add { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .calc-add input { border: 1px solid var(--gold-soft); border-radius: 6px; padding: 6px 8px; font-size: 12px; font-family: inherit; background: #FEFDF9; }
+  .calc-add input.calc-name { flex: 1; min-width: 80px; }
+  .calc-add input.calc-perunit { width: 90px; font-family: 'IBM Plex Mono', monospace; }
+  .calc-add input.calc-qty { width: 60px; font-family: 'IBM Plex Mono', monospace; }
+  .calc-add button { border: none; background: var(--gold); color: #fff; border-radius: 6px; padding: 0 10px; font-size: 13px; cursor: pointer; font-weight: 600; }
+  .calc-total-row { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; margin-bottom: 8px; font-weight: 600; }
+  .calc-use-btn { border: none; background: var(--forest); color: #fff; border-radius: 6px; padding: 7px 12px; font-size: 12px; cursor: pointer; font-weight: 600; width: 100%; }
+  .calc-use-btn:hover { background: var(--forest-deep); }
+  .calc-hint { font-size: 11px; color: var(--ink-soft); margin: 0 0 8px; line-height: 1.5; }
+
+  .footer-actions { display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  .footer-note { font-size: 12px; color: var(--ink-soft); text-align: center; margin-top: 14px; line-height: 1.6; max-width: 60ch; margin-left: auto; margin-right: auto; }
+  .reset-btn, .close-month-btn {
+    background: none; border: 1px solid var(--line); color: var(--ink-soft); font-size: 11.5px;
+    padding: 6px 12px; border-radius: 6px; cursor: pointer;
+  }
+  .close-month-btn { border-color: var(--gold); color: #6B4E17; }
+  .close-month-btn:hover { background: var(--gold-soft); }
+  .reset-btn:hover { border-color: var(--brick); color: var(--brick); }
+
+  .loading-state { text-align: center; padding: 60px 20px; color: var(--ink-soft); font-size: 13px; }
+
+  .view-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .view-tab {
+    border: 1px solid var(--line); background: var(--card); color: var(--ink-soft);
+    padding: 8px 16px; border-radius: 8px 8px 0 0; font-size: 13px; font-weight: 600; cursor: pointer;
+    border-bottom: none;
+  }
+  .view-tab.active { background: var(--forest); color: #fff; border-color: var(--forest); }
+  .view-tab:not(.active):hover { color: var(--forest); }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 700px) { .stat-grid { grid-template-columns: 1fr 1fr; } }
+
+  .stat-section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 20px; }
+  .stat-section h3 { font-family: Georgia, serif; font-size: 16px; margin: 0 0 4px; }
+  .stat-section .stat-desc { font-size: 12px; color: var(--ink-soft); margin: 0 0 14px; }
+
+  .alloc-bar { display: flex; height: 28px; border-radius: 6px; overflow: hidden; margin-bottom: 10px; }
+  .alloc-seg { display: flex; align-items: center; justify-content: center; font-size: 10.5px; color: #fff; font-weight: 700; overflow: hidden; white-space: nowrap; }
+  .alloc-legend { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+  .alloc-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-soft); }
+  .alloc-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  .compare-row { margin-bottom: 14px; }
+  .compare-row:last-child { margin-bottom: 0; }
+  .compare-label { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
+  .compare-label .name { font-weight: 600; }
+  .compare-label .nums { color: var(--ink-soft); }
+  .compare-track { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; position: relative; }
+  .compare-fill { height: 100%; border-radius: 5px; transition: width 0.4s ease; }
+
+  .burn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 700px) { .burn-grid { grid-template-columns: 1fr; } }
+  .ratio-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 800px) { .ratio-grid { grid-template-columns: 1fr; } }
+  .burn-card { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .burn-card .name { font-weight: 600; font-size: 13.5px; margin-bottom: 8px; }
+  .burn-stat { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
+  .burn-stat .k { color: var(--ink-soft); }
+  .burn-stat .v { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+  .burn-status { margin-top: 8px; font-size: 11.5px; padding: 5px 8px; border-radius: 6px; font-weight: 600; }
+  .burn-status.aman { background: #E7F0EA; color: #2F5A40; }
+  .burn-status.waspada { background: #FBF0DC; color: #7A5A17; }
+  .burn-status.lewat { background: #F6E7E6; color: #7A2E29; }
+
+  .empty-stat { font-size: 12.5px; color: var(--ink-soft); font-style: italic; }
+
+  @media (max-width: 600px) {
+    .header { padding: 20px 16px 50px; }
+    .title { font-size: 21px; }
+    .subtitle { max-width: none; font-size: 12px; }
+    .income-box { min-width: 0; width: 100%; }
+    .content { padding: 0 14px 50px; }
+    .view-tabs { flex-wrap: wrap; gap: 6px; }
+    .view-tab { padding: 7px 11px; font-size: 12px; flex: 1 1 auto; text-align: center; }
+    .step-badge { width: 34px; font-size: 16px; }
+    .envelope-body { padding: 12px 12px 14px; }
+    .envelope-head { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .pct-editable { text-align: left; }
+    .pct-nominal { text-align: left; }
+    .add-tx input, .add-tx select { flex: 1 1 100%; }
+    .add-tx input.amount, .add-tx input.tx-date { flex: 1 1 45%; }
+    .add-tx button { flex: 1 1 100%; padding: 8px; }
+    .summary-strip { grid-template-columns: 1fr 1fr; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .goal-row-head { flex-wrap: wrap; }
+    .cal-day-num { font-size: 10px; }
+  }
+
+  .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; }
+  .cal-weekdays span { text-align: center; font-size: 10.5px; color: var(--ink-soft); font-weight: 600; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-cell {
+    aspect-ratio: 1; border: 1px solid var(--line); border-radius: 6px; background: rgba(184,134,46,var(--fill-opacity, 0));
+    display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 2px;
+    font-family: inherit; overflow: hidden;
+  }
+  .cal-cell.cal-empty { border: none; background: none; cursor: default; }
+  .cal-cell.cal-selected { border: 2px solid var(--forest); }
+  .cal-day-num { font-size: 11px; font-weight: 600; color: var(--ink); }
+  .cal-day-total { font-size: 8.5px; color: var(--ink-soft); text-align: center; line-height: 1.2; }
+  @media (max-width: 500px) { .cal-day-total { display: none; } }
+
+  .table-scroll { overflow-x: auto; margin-bottom: 4px; -webkit-overflow-scrolling: touch; }
+
+  .plan-card .plan-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; cursor: pointer; margin-bottom: 8px; }
+  .plan-item-list { max-height: none; }
+  .plan-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .plan-item.plan-item-done .plan-item-name { text-decoration: line-through; color: var(--ink-soft); }
+  .plan-item-name { flex: 1; min-width: 120px; }
+  .plan-item-qty { color: var(--ink-soft); font-size: 11px; }
+  .plan-actual-input { width: 100px; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font-size: 11.5px; }
+  .plan-summary { display: flex; flex-wrap: wrap; gap: 16px; margin: 12px 0; padding: 10px 12px; background: #F3EEDD; border-radius: 8px; }
+  .plan-summary > div { display: flex; flex-direction: column; gap: 2px; }
+  .plan-summary .k { font-size: 10.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; }
+  .plan-summary .v { font-size: 14px; font-weight: 700; }
+  .plan-record-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .plan-record-row select { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 12px; font-family: inherit; }
+  .plan-record-row .calc-use-btn { width: auto; flex: 1; min-width: 200px; }
+  .stat-table { border-collapse: collapse; width: 100%; font-size: 12px; white-space: nowrap; }
+  .stat-table th, .stat-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; }
+  .stat-table th:first-child, .stat-table td:first-child { text-align: left; }
+  .stat-table th { background: var(--paper); color: var(--ink-soft); font-weight: 600; position: sticky; top: 0; }
+  .stat-table tbody tr:hover { background: #F7F3E8; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(15,42,34,0.45);
+    display: flex; align-items: center; justify-content: center; z-index: 999; padding: 20px;
+  }
+  .modal-box { background: var(--card); border-radius: 12px; padding: 20px 22px; max-width: 380px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+  .modal-box p { font-size: 13.5px; color: var(--ink); line-height: 1.6; margin: 0 0 18px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal-actions button { border-radius: 6px; padding: 8px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: none; color: var(--ink-soft); }
+  .modal-actions button.confirm { background: var(--brick); color: #fff; border-color: var(--brick); }
+  .modal-actions button.confirm.safe { background: var(--forest); border-color: var(--forest); }
+
+  .darurat-formula { font-size: 11px; color: var(--ink-soft); margin: -4px 0 8px; font-style: italic; }
+  .sisa-line { font-size: 11.5px; color: var(--ink-soft); margin: -4px 0 8px; }
+  .sisa-line.over { color: var(--brick); font-weight: 600; }
+  .sisa-line.ok { color: var(--sage); font-weight: 600; }
+
+  .lap-header {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin-bottom: 20px;
+  }
+  .lap-title { font-family: Georgia, serif; font-size: 24px; color: var(--forest); margin: 0 0 6px; letter-spacing: 0.02em; }
+  .lap-subtitle { font-size: 12px; color: var(--ink-soft); font-style: italic; max-width: 46ch; margin: 0; }
+  .lap-period { text-align: right; font-weight: 700; color: var(--forest); font-size: 15px; }
+  .lap-period span { display: block; font-weight: 400; font-size: 10.5px; color: var(--ink-soft); margin-top: 2px; }
+  .lap-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  @media (max-width: 700px) { .lap-summary-grid { grid-template-columns: 1fr 1fr; } }
+  .lap-grid-3 { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .lap-grid-3 { grid-template-columns: 1fr; } }
+  .lap-grid-2 { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .lap-grid-2 { grid-template-columns: 1fr; } }
+  .lap-goal { margin-bottom: 14px; }
+  .lap-goal:last-child { margin-bottom: 0; }
+  .lap-goal-name { font-size: 12.5px; font-weight: 600; margin-bottom: 2px; }
+  .lap-goal-amt { font-size: 12px; margin-bottom: 4px; }
+  .lap-alloc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .lap-alloc-card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #FEFDF9; }
+  .lap-alloc-pct { font-size: 18px; font-weight: 700; color: var(--forest); }
+  .lap-alloc-name { font-size: 11.5px; color: var(--ink-soft); margin-bottom: 4px; }
+  .lap-alloc-amt { font-size: 11.5px; margin-bottom: 6px; }
+  .lap-notes { width: 100%; min-height: 90px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-family: inherit; font-size: 13px; resize: vertical; }
+  .lap-actions { display: flex; justify-content: center; margin: 16px 0 6px; }
+
+  #rab-print-area { display: none; }
+  .rab-doc { font-family: Georgia, 'Times New Roman', serif; color: #1B2E28; }
+  .rab-title { text-align: center; font-size: 19px; letter-spacing: 0.03em; margin: 0 0 4px; color: #1B4332; font-weight: 700; }
+  .rab-subtitle { text-align: center; font-size: 11px; color: #6B5B3A; margin: 0 0 16px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .rab-info { margin-bottom: 16px; font-size: 12px; border-collapse: collapse; }
+  .rab-info td { padding: 1px 6px 1px 0; vertical-align: top; color: #1B2E28; }
+  .rab-info td:first-child { white-space: nowrap; color: #4A5A54; }
+  .rab-table { width: 100%; max-width: 100%; border-collapse: collapse; font-size: 10.5px; table-layout: fixed; }
+  .rab-table th, .rab-table td { border: 1px solid #A9BDB0; padding: 5px 6px; word-wrap: break-word; overflow-wrap: break-word; }
+  .rab-table th { text-align: center; background: #1B4332; color: #fff; font-weight: 700; font-size: 10px; letter-spacing: 0.02em; }
+  .rab-table td.rab-c { text-align: center; }
+  .rab-table td.rab-r { text-align: right; white-space: nowrap; }
+  .rab-table tr.rab-item-row-alt td { background: #F7F3E6; }
+  .rab-table tr.rab-section-row td { background: #E4CFA0; color: #5A4212; }
+  .rab-table tr.rab-grand-row td { background: #1B4332; color: #fff; border-top: 2px solid #0F2A22; font-size: 11.5px; }
+
+  @page { size: A4; margin: 14mm 12mm; }
+  @media print {
+    body * { visibility: hidden; }
+    #rab-print-area, #rab-print-area * { visibility: visible; }
+    #rab-print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; padding: 0; }
+    .rab-table { font-size: 10px; }
+  }
+</style>
+
+<script>
+(function() {
+  const STORAGE_KEY = 'kantong-keuangan-v2-data';
+  const INSTRUMENTS = ['Kas/Deposito', 'Reksadana', 'Obligasi', 'Saham', 'Emas', 'Lainnya'];
+  const uiState = { calcOpen: {}, view: 'kantong', confirmModal: null, addGoalOpen: false, addIncomeOpen: false, harianYear: new Date().getFullYear(), harianMonth: new Date().getMonth(), harianSelectedDate: null, addPlanOpen: false, openPlanId: null };
+
+  function formatRupiah(n) {
+    n = Math.round(Number(n) || 0);
+    return 'Rp' + n.toLocaleString('id-ID');
+  }
+  function pctNominal(pct) {
+    return formatRupiah(totalIncome() * (Number(pct) || 0) / 100);
+  }
+  function totalIncome() {
+    const extra = (state.incomeExtra || []).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+    return (Number(state.income) || 0) + extra;
+  }
+  function formatMoneyString(raw) {
+    const digits = String(raw == null ? '' : raw).replace(/[^0-9]/g, '');
+    if (!digits) return '';
+    return Number(digits).toLocaleString('id-ID');
+  }
+  function parseMoneyString(str) {
+    return Number(String(str == null ? '' : str).replace(/\./g, '')) || 0;
+  }
+  function uid() { return Math.random().toString(36).slice(2, 9); }
+  const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const MONTHS_FULL = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
+  function formatDateShort(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '';
+    return d.getDate() + ' ' + MONTHS_SHORT[d.getMonth()];
+  }
+  function formatDateLong(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '';
+    return d.getDate() + ' ' + MONTHS_FULL[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  function defaultState() {
+    return {
+      income: 5000000,
+      incomeExtra: [],
+      pokok: { pct: 50, transactions: [], calc: [] },
+      darurat: { pct: 10, targetMonths: 6, transactions: [] },
+      tabungan: { pct: 15, goals: [
+        { id: uid(), name: 'Dana Pendidikan', target: 20000000, transactions: [] }
+      ] },
+      investasi: { pct: 15, transactions: [] },
+      tambahan: { pct: 10, transactions: [], calc: [] },
+      utang: { enabled: false, pct: 0, transactions: [] },
+      history: [],
+      budgetPlans: [],
+      notes: ''
+    };
+  }
+
+  const root = document.getElementById('app-root');
+  root.innerHTML = '<div class="loading-state">Memuat data keuangan…</div>';
+  let state = null;
+
+  root.addEventListener('input', (e) => {
+    if (e.target.classList && e.target.classList.contains('money-input')) {
+      const el = e.target;
+      const cursorFromEnd = el.value.length - el.selectionStart;
+      const formatted = formatMoneyString(el.value);
+      el.value = formatted;
+      const pos = Math.max(0, formatted.length - cursorFromEnd);
+      try { el.setSelectionRange(pos, pos); } catch (err) {}
+    }
+  });
+
+  async function loadState() {
+    try {
+      const result = await window.storage.get(STORAGE_KEY, false);
+      if (result && result.value) {
+        state = JSON.parse(result.value);
+        const d = defaultState();
+        // fill in any missing fields from schema updates
+        Object.keys(d).forEach(k => { if (state[k] === undefined) state[k] = d[k]; });
+        if (!state.tabungan.goals) state.tabungan.goals = d.tabungan.goals;
+        if (!state.utang) state.utang = d.utang;
+        if (!state.pokok.calc) state.pokok.calc = [];
+        if (!state.tambahan.calc) state.tambahan.calc = [];
+        if (!state.history) state.history = [];
+        if (!state.incomeExtra) state.incomeExtra = [];
+        if (!state.budgetPlans) state.budgetPlans = [];
+        if (state.notes == null) state.notes = '';
+      } else {
+        state = defaultState();
+      }
+    } catch (e) {
+      state = defaultState();
+    }
+    render();
+  }
+
+  async function saveState() {
+    try { await window.storage.set(STORAGE_KEY, JSON.stringify(state), false); }
+    catch (e) { console.error('Gagal menyimpan data', e); }
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : str;
+    return div.innerHTML;
+  }
+
+  // ---- derived calculations ----
+  function pokokTarget() { return totalIncome() * (Number(state.pokok.pct) || 0) / 100; }
+  function pokokSpent() { return state.pokok.transactions.reduce((s, t) => s + t.amount, 0); }
+
+  function daruratTarget() { return pokokTarget() * (Number(state.darurat.targetMonths) || 0); }
+  function daruratSaldo() {
+    return state.darurat.transactions.reduce((s, t) => s + (t.type === 'out' ? -t.amount : t.amount), 0);
+  }
+  function daruratReached() {
+    const target = daruratTarget();
+    return target > 0 && daruratSaldo() >= target;
+  }
+
+  function tabunganSaldo() {
+    return state.tabungan.goals.reduce((sum, g) => sum + g.transactions.reduce((s, t) => s + t.amount, 0), 0);
+  }
+
+  function investasiSaldo() { return state.investasi.transactions.reduce((s, t) => s + t.amount, 0); }
+  function investasiEffectivePct() { return (Number(state.investasi.pct) || 0) + (daruratReached() ? (Number(state.darurat.pct) || 0) : 0); }
+
+  function tambahanTarget() { return totalIncome() * (Number(state.tambahan.pct) || 0) / 100; }
+  function tambahanSpent() { return state.tambahan.transactions.reduce((s, t) => s + t.amount, 0); }
+
+  function utangTarget() { return totalIncome() * (Number(state.utang.pct) || 0) / 100; }
+  function utangSpent() { return state.utang.transactions.reduce((s, t) => s + t.amount, 0); }
+
+  function totalPct() {
+    return (Number(state.pokok.pct)||0) + (Number(state.darurat.pct)||0) + (Number(state.tabungan.pct)||0)
+      + (Number(state.investasi.pct)||0) + (Number(state.tambahan.pct)||0) + (state.utang.enabled ? (Number(state.utang.pct)||0) : 0);
+  }
+
+  // ---- render ----
+  function render() {
+    const totalAlloc = totalPct();
+    const dReached = daruratReached();
+    const dTarget = daruratTarget();
+    const dSaldo = daruratSaldo();
+    const dPct = dTarget > 0 ? Math.min(100, (dSaldo / dTarget) * 100) : 0;
+    const kekayaanTerkumpul = dSaldo + tabunganSaldo() + investasiSaldo();
+
+    root.innerHTML = `
+      <div class="header">
+        <div class="header-top">
+          <div>
+            <p class="eyebrow">Kantong Keuangan</p>
+            <h1 class="title">Bayar Dirimu Sendiri Dulu</h1>
+            <p class="subtitle">Urutan di bawah ini ikut prinsip "pay yourself first": kebutuhan pokok dulu, lalu dana darurat & tabungan tujuan disisihkan sebelum uang sempat "menguap", baru investasi, dan kebutuhan tambahan diletakkan paling akhir.</p>
+          </div>
+          <div class="income-box">
+            <label>Pemasukan Utama Bulan Ini</label>
+            <input type="text" inputmode="numeric" class="num money-input" id="income-input" value="${formatMoneyString(state.income)}">
+            ${(state.incomeExtra || []).length > 0 ? `
+              <ul class="income-extra-list">
+                ${state.incomeExtra.map(x => `
+                  <li><span>${escapeHtml(x.name)}</span><span class="num">${formatRupiah(x.amount)}</span><button data-action="del-income-extra" data-id="${x.id}">✕</button></li>
+                `).join('')}
+              </ul>
+            ` : ''}
+            <button class="income-add-toggle" data-action="toggle-add-income">${uiState.addIncomeOpen ? '✕ Batal' : '+ Pemasukan Tambahan'}</button>
+            ${uiState.addIncomeOpen ? `
+              <div class="income-add-form">
+                <input type="text" placeholder="Nama (mis. Bonus, Freelance)" id="new-income-name">
+                <input type="text" inputmode="numeric" class="num money-input" placeholder="Jumlah" id="new-income-amount">
+                <button data-action="confirm-add-income">Tambah</button>
+              </div>
+            ` : ''}
+            <div class="income-total-row">Total Pemasukan <span class="num">${formatRupiah(totalIncome())}</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="view-tabs">
+          <button class="view-tab ${uiState.view === 'kantong' ? 'active' : ''}" data-action="switch-view" data-view="kantong">🗂️ Kantong</button>
+          <button class="view-tab ${uiState.view === 'harian' ? 'active' : ''}" data-action="switch-view" data-view="harian">📅 Harian</button>
+          <button class="view-tab ${uiState.view === 'statistik' ? 'active' : ''}" data-action="switch-view" data-view="statistik">📊 Statistik</button>
+          <button class="view-tab ${uiState.view === 'tabel' ? 'active' : ''}" data-action="switch-view" data-view="tabel">📋 Tabel</button>
+          <button class="view-tab ${uiState.view === 'rencana' ? 'active' : ''}" data-action="switch-view" data-view="rencana">🎯 Rencana</button>
+          <button class="view-tab ${uiState.view === 'laporan' ? 'active' : ''}" data-action="switch-view" data-view="laporan">📑 Laporan</button>
+          <button class="view-tab ${uiState.view === 'panduan' ? 'active' : ''}" data-action="switch-view" data-view="panduan">📖 Panduan</button>
+        </div>
+        <div id="view-container"></div>
+      </div>
+      ${uiState.confirmModal ? `
+        <div class="modal-overlay">
+          <div class="modal-box">
+            <p>${escapeHtml(uiState.confirmModal.message)}</p>
+            <div class="modal-actions">
+              <button data-action="modal-cancel">Batal</button>
+              <button class="confirm ${uiState.confirmModal.safe ? 'safe' : ''}" data-action="modal-confirm">${uiState.confirmModal.confirmLabel || 'Ya, lanjutkan'}</button>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+    `;
+
+    root.querySelectorAll('[data-action="switch-view"]').forEach(el => {
+      el.addEventListener('click', () => {
+        uiState.view = el.getAttribute('data-view');
+        render();
+      });
+    });
+
+    const viewContainer = document.getElementById('view-container');
+    if (uiState.view === 'statistik') {
+      viewContainer.innerHTML = renderStatistikView();
+    } else if (uiState.view === 'harian') {
+      viewContainer.innerHTML = renderHarianView();
+      attachHarianEvents();
+    } else if (uiState.view === 'tabel') {
+      viewContainer.innerHTML = renderTabelView();
+      attachTabelEvents();
+    } else if (uiState.view === 'rencana') {
+      viewContainer.innerHTML = renderRencanaView();
+      attachRencanaEvents();
+    } else if (uiState.view === 'laporan') {
+      viewContainer.innerHTML = renderLaporanView();
+      attachLaporanEvents();
+    } else if (uiState.view === 'panduan') {
+      viewContainer.innerHTML = renderPanduanView();
+    } else {
+      viewContainer.innerHTML = `
+        <div class="summary-strip">
+          <div class="summary-card">
+            <div class="label">Total Dialokasikan</div>
+            <div class="value ${totalAlloc > 100 ? 'warn' : ''} num">${totalAlloc}%</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Dana Darurat</div>
+            <div class="value ${dReached ? 'ok' : ''} num">${dTarget > 0 ? Math.round(dPct) + '%' : '—'} ${dReached ? '✓' : ''}</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Kekayaan Terkumpul</div>
+            <div class="value ok num">${formatRupiah(kekayaanTerkumpul)}</div>
+          </div>
+        </div>
+
+        <div class="flow-note">
+          <b>Kenapa urutannya begini?</b> Dana darurat & tabungan disisihkan di awal supaya tidak keburu habis untuk hal-hal yang sifatnya keinginan. Kebutuhan tambahan sengaja ditaruh terakhir — bagian ini paling mudah membengkak tanpa sadar, jadi ditempatkan setelah tujuan jangka panjangmu aman.
+        </div>
+
+        <div class="stairs" id="stairs-container"></div>
+
+        <div class="footer-actions">
+          <button class="close-month-btn" data-action="close-month">Tutup Bulan Ini</button>
+          <button class="reset-btn" data-action="reset-all">Reset Semua Data</button>
+        </div>
+        <p class="footer-note">"Tutup Bulan Ini" mengosongkan catatan Kebutuhan Pokok, Tambahan, dan Cicilan untuk mulai bulan baru — saldo Dana Darurat, Tabungan Tujuan, dan Investasi tidak akan hilang karena sifatnya terkumpul. Semua data tersimpan otomatis di perangkatmu.</p>
+      `;
+      renderStairs();
+      attachKantongActionEvents();
+    }
+
+    attachHeaderEvents();
+    attachModalEvents();
+  }
+
+  function attachModalEvents() {
+    const cancelBtn = root.querySelector('[data-action="modal-cancel"]');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { uiState.confirmModal = null; render(); });
+    const confirmBtn = root.querySelector('[data-action="modal-confirm"]');
+    if (confirmBtn) confirmBtn.addEventListener('click', async () => {
+      const action = uiState.confirmModal ? uiState.confirmModal.onConfirm : null;
+      uiState.confirmModal = null;
+      if (action) await action();
+      render();
+    });
+  }
+
+  function isThisMonth(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }
+
+  function computeBurn(key, target) {
+    const now = new Date();
+    const today = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const spentThisMonth = state[key].transactions.filter(t => isThisMonth(t.date)).reduce((s, t) => s + t.amount, 0);
+    const avgPerDay = spentThisMonth / Math.max(1, today);
+    const projectedTotal = avgPerDay * daysInMonth;
+    let status = 'aman';
+    if (target > 0) {
+      if (projectedTotal > target) status = 'lewat';
+      else if (projectedTotal > target * 0.9) status = 'waspada';
+    }
+    return { today, daysInMonth, spentThisMonth, avgPerDay, projectedTotal, target, status };
+  }
+
+  function compareRow(color, name, actual, target, actualLabel) {
+    const pct = target > 0 ? Math.min(100, (actual / target) * 100) : (actual > 0 ? 100 : 0);
+    const over = target > 0 && actual > target;
+    return `
+      <div class="compare-row">
+        <div class="compare-label">
+          <span class="name">${name}</span>
+          <span class="nums num">${formatRupiah(actual)} ${actualLabel || ''} ${target > 0 ? '/ ' + formatRupiah(target) : ''}</span>
+        </div>
+        <div class="compare-track"><div class="compare-fill" style="width:${pct}%; background:${over ? 'var(--brick)' : color}"></div></div>
+      </div>
+    `;
+  }
+
+  function renderDonutSVG(segments, size) {
+    size = size || 180;
+    const total = segments.reduce((s, x) => s + x.value, 0);
+    if (total <= 0) return '<p class="empty-stat">Belum ada data.</p>';
+    const cx = size / 2, cy = size / 2, r = size / 2 - 10, strokeW = size * 0.22;
+    let angleStart = -90;
+    const arcs = segments.filter(s => s.value > 0).map(seg => {
+      const angleSize = (seg.value / total) * 360;
+      const angleEnd = angleStart + angleSize;
+      const largeArc = angleSize > 180 ? 1 : 0;
+      const x1 = cx + r * Math.cos(angleStart * Math.PI / 180);
+      const y1 = cy + r * Math.sin(angleStart * Math.PI / 180);
+      const x2 = cx + r * Math.cos(angleEnd * Math.PI / 180);
+      const y2 = cy + r * Math.sin(angleEnd * Math.PI / 180);
+      const path = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
+      angleStart = angleEnd;
+      return `<path d="${path}" stroke="${seg.color}" stroke-width="${strokeW}" fill="none" />`;
+    }).join('');
+    return `<svg viewBox="0 0 ${size} ${size}" style="width:100%;max-width:${size}px;height:auto;display:block;margin:0 auto;">${arcs}</svg>`;
+  }
+
+  function renderBarChartSVG(items, opts) {
+    opts = opts || {};
+    const width = opts.width || 600, height = opts.height || 200;
+    const padL = 12, padR = 12, padT = 30, padB = 32;
+    const innerW = width - padL - padR, innerH = height - padT - padB;
+    const maxVal = Math.max(1, ...items.map(i => i.value));
+    const n = items.length || 1;
+    const maxBarW = 56;
+    const gap = Math.min(innerW * 0.02, 14);
+    const rawBarW = (innerW - gap * (n - 1)) / n;
+    const barW = Math.min(maxBarW, rawBarW);
+    const usedW = barW * n + gap * (n - 1);
+    const offsetX = padL + Math.max(0, (innerW - usedW) / 2);
+    const baseline = padT + innerH;
+    const activeVals = items.map(i => i.value).filter(v => v > 0);
+    const avg = activeVals.length > 0 ? activeVals.reduce((s, v) => s + v, 0) / activeVals.length : 0;
+    const gridLines = [0.25, 0.5, 0.75, 1].map(f => {
+      const y = padT + innerH * (1 - f);
+      return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${width - padR}" y2="${y.toFixed(1)}" stroke="#E4DCC5" stroke-width="1" stroke-dasharray="3,3" />`;
+    }).join('');
+    const avgLine = avg > 0 ? (() => {
+      const y = baseline - Math.min(innerH, (avg / maxVal) * innerH);
+      return `
+        <line x1="${padL}" y1="${y.toFixed(1)}" x2="${width - padR}" y2="${y.toFixed(1)}" stroke="#B8862E" stroke-width="1.3" stroke-dasharray="5,3" />
+        <text x="${width - padR}" y="${(y - 4).toFixed(1)}" font-size="8.5" text-anchor="end" fill="#8A6A20" font-weight="600">rata-rata ${formatCompact(avg)}</text>
+      `;
+    })() : '';
+    const bars = items.map((it, idx) => {
+      const barH = it.value > 0 ? Math.max(3, (it.value / maxVal) * innerH) : 0;
+      const x = offsetX + idx * (barW + gap);
+      const y = baseline - barH;
+      const showValueLabel = it.value > 0 && (n <= 8 || it.value === maxVal);
+      let pctTag = '';
+      if (showValueLabel && avg > 0) {
+        const diff = ((it.value - avg) / avg) * 100;
+        const sign = diff > 0 ? '+' : (diff < 0 ? '' : '±');
+        const tagColor = diff > 5 ? 'var(--brick)' : (diff < -5 ? '#2F5A40' : '#8A6A20');
+        pctTag = `<text x="${(x + barW / 2).toFixed(1)}" y="${(y - 17).toFixed(1)}" font-size="8" text-anchor="middle" fill="${tagColor}" font-weight="700">${sign}${Math.round(diff)}%</text>`;
+      }
+      return `
+        <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="${it.color || 'var(--forest)'}"><title>${it.label}: ${formatRupiah(it.value)}${avg > 0 ? ' (' + (it.value >= avg ? '+' : '') + Math.round(((it.value - avg) / avg) * 100) + '% dari rata-rata)' : ''}</title></rect>
+        ${pctTag}
+        ${showValueLabel ? `<text x="${(x + barW / 2).toFixed(1)}" y="${(y - 6).toFixed(1)}" font-size="9" text-anchor="middle" fill="#1B2E28" font-weight="600">${formatCompact(it.value)}</text>` : ''}
+        <text x="${(x + barW / 2).toFixed(1)}" y="${height - 12}" font-size="9" text-anchor="middle" fill="#4A5A54">${it.label}</text>
+      `;
+    }).join('');
+    return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;display:block;">
+      ${gridLines}
+      ${avgLine}
+      <line x1="${padL}" y1="${baseline.toFixed(1)}" x2="${width - padR}" y2="${baseline.toFixed(1)}" stroke="#B8A97A" stroke-width="1.5" />
+      ${bars}
+    </svg>`;
+  }
+
+  function formatCompact(n) {
+    n = Number(n) || 0;
+    if (n >= 1000000000) return (n / 1000000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'jt';
+    if (n >= 1000) return Math.round(n / 1000) + 'rb';
+    return String(n);
+  }
+
+  function renderDailyTrendChart() {
+    const now = new Date();
+    const year = now.getFullYear(), month = now.getMonth();
+    const totals = dailyTotals(year, month);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const items = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      items.push({ label: (d % 5 === 0 || d === 1) ? String(d) : '', value: totals[key] || 0, color: '#1B4332' });
+    }
+    const hasData = items.some(i => i.value > 0);
+    if (!hasData) return '<p class="empty-stat">Belum ada catatan pengeluaran bulan ini.</p>';
+    return renderBarChartSVG(items, { width: 700, height: 180 });
+  }
+
+  function renderMonthlyTrendChart() {
+    const rows = buildMonthlyRows().slice(0, 12).reverse();
+    if (rows.length === 0) return '<p class="empty-stat">Belum ada data bulanan.</p>';
+    const items = rows.map(r => ({ label: MONTHS_SHORT[r.month], value: r.totalPengeluaran, color: r.isCurrent ? '#B8862E' : '#1B4332' }));
+    return renderBarChartSVG(items, { width: 700, height: 200 });
+  }
+
+  function renderYearlyTrendChart() {
+    const rows = buildYearlyRows(buildMonthlyRows()).slice().reverse();
+    if (rows.length === 0) return '<p class="empty-stat">Belum ada data tahunan.</p>';
+    const items = rows.map(r => ({ label: String(r.year), value: r.totalPengeluaran, color: '#5B4E8A' }));
+    return renderBarChartSVG(items, { width: 700, height: 200 });
+  }
+
+  function computeAllocationSegments(dReachedOverride) {
+    const dReached = dReachedOverride !== undefined ? dReachedOverride : daruratReached();
+    const segs = [
+      { name: 'Kebutuhan Pokok', pct: Number(state.pokok.pct) || 0, color: '#1B4332' },
+      { name: 'Dana Darurat', pct: dReached ? 0 : (Number(state.darurat.pct) || 0), color: '#A8443E' },
+      { name: 'Tabungan Tujuan', pct: Number(state.tabungan.pct) || 0, color: '#4C7A5B' },
+      { name: 'Investasi' + (dReached ? ' (+darurat)' : ''), pct: investasiEffectivePct(), color: '#5B4E8A' },
+      { name: 'Kebutuhan Tambahan', pct: Number(state.tambahan.pct) || 0, color: '#B8862E' },
+    ];
+    if (state.utang.enabled) segs.push({ name: 'Cicilan / Utang', pct: Number(state.utang.pct) || 0, color: '#7A6C5D' });
+    return segs;
+  }
+
+  function renderStatistikView() {
+    const dTarget = daruratTarget();
+    const dSaldo = daruratSaldo();
+    const dReached = daruratReached();
+    const pokokSp = pokokSpent(), pokokTg = pokokTarget();
+    const tambahanSp = tambahanSpent(), tambahanTg = tambahanTarget();
+    const utangSp = utangSpent(), utangTg = utangTarget();
+    const tabunganGoalsTarget = state.tabungan.goals.reduce((s, g) => s + (Number(g.target) || 0), 0);
+    const tabunganSd = tabunganSaldo();
+    const investasiSd = investasiSaldo();
+
+    const totalTerpakaiBulanIni = pokokSp + tambahanSp + (state.utang.enabled ? utangSp : 0);
+    const daruratDepositBulanIni = state.darurat.transactions.filter(t => isThisMonth(t.date) && t.type !== 'out').reduce((s, t) => s + t.amount, 0);
+    const tabunganDepositBulanIni = state.tabungan.goals.reduce((s, g) => s + g.transactions.filter(t => isThisMonth(t.date)).reduce((ss, t) => ss + t.amount, 0), 0);
+    const investasiDepositBulanIni = state.investasi.transactions.filter(t => isThisMonth(t.date)).reduce((s, t) => s + t.amount, 0);
+    const depositBulanIni = daruratDepositBulanIni + tabunganDepositBulanIni + investasiDepositBulanIni;
+    const sisa = totalIncome() - totalTerpakaiBulanIni - depositBulanIni;
+
+    // ---- rasio kesehatan keuangan ----
+    const asetLikuid = dSaldo + tabunganSd;
+    const rasioDaruratBulan = totalTerpakaiBulanIni > 0 ? asetLikuid / totalTerpakaiBulanIni : (asetLikuid > 0 ? 99 : 0);
+    const dsr = totalIncome() > 0 ? ((state.utang.enabled ? utangSp : 0) / totalIncome()) * 100 : 0;
+    const rasioTabungan = totalIncome() > 0 ? ((tabunganDepositBulanIni + investasiDepositBulanIni) / totalIncome()) * 100 : 0;
+    function statusOf(value, goodMin, warnMin, higherIsBetter) {
+      if (higherIsBetter) {
+        if (value >= goodMin) return { label: 'Sehat', cls: 'aman' };
+        if (value >= warnMin) return { label: 'Cukup', cls: 'waspada' };
+        return { label: 'Kurang', cls: 'lewat' };
+      } else {
+        if (value <= goodMin) return { label: 'Sehat', cls: 'aman' };
+        if (value <= warnMin) return { label: 'Waspada', cls: 'waspada' };
+        return { label: 'Tidak Sehat', cls: 'lewat' };
+      }
+    }
+    const daruratStatus = statusOf(rasioDaruratBulan, 6, 3, true);
+    const dsrStatus = statusOf(dsr, 30, 35, false);
+    const tabunganStatus = statusOf(rasioTabungan, 20, 10, true);
+
+    // allocation segments (effective)
+    const segs = computeAllocationSegments(dReached);
+    const segTotal = segs.reduce((s, x) => s + x.pct, 0) || 1;
+    const allocBarHtml = segs.filter(s => s.pct > 0).map(s => `<div class="alloc-seg" style="width:${(s.pct / segTotal) * 100}%; background:${s.color}">${s.pct}%</div>`).join('');
+    const allocLegendHtml = segs.map(s => `<div class="alloc-legend-item"><span class="alloc-legend-dot" style="background:${s.color}"></span>${s.name}: ${s.pct}%</div>`).join('');
+
+    // instrument diversifikasi
+    const byInstrument = {};
+    state.investasi.transactions.forEach(t => { byInstrument[t.instrument || 'Lainnya'] = (byInstrument[t.instrument || 'Lainnya'] || 0) + t.amount; });
+    const instrColors = { 'Kas/Deposito': '#7A6C5D', 'Reksadana': '#5B4E8A', 'Obligasi': '#B8862E', 'Saham': '#A8443E', 'Emas': '#C9A227', 'Lainnya': '#4A5A54' };
+    const instrTotal = Object.values(byInstrument).reduce((s, v) => s + v, 0);
+    const instrBarHtml = instrTotal > 0 ? Object.entries(byInstrument).map(([k, v]) => `<div class="alloc-seg" style="width:${(v / instrTotal) * 100}%; background:${instrColors[k] || '#4A5A54'}">${Math.round((v / instrTotal) * 100)}%</div>`).join('') : '';
+    const instrLegendHtml = Object.entries(byInstrument).map(([k, v]) => `<div class="alloc-legend-item"><span class="alloc-legend-dot" style="background:${instrColors[k] || '#4A5A54'}"></span>${k}: ${formatRupiah(v)}</div>`).join('');
+
+    const burnPokok = computeBurn('pokok', pokokTg);
+    const burnTambahan = computeBurn('tambahan', tambahanTg);
+
+    function burnCardHtml(name, b) {
+      const statusText = { aman: 'Aman, sesuai anggaran', waspada: 'Waspada, mendekati batas', lewat: 'Diperkirakan lewat anggaran' }[b.status];
+      return `
+        <div class="burn-card">
+          <div class="name">${name}</div>
+          <div class="burn-stat"><span class="k">Terpakai bulan ini</span><span class="v">${formatRupiah(b.spentThisMonth)}</span></div>
+          <div class="burn-stat"><span class="k">Rata-rata / hari</span><span class="v">${formatRupiah(b.avgPerDay)}</span></div>
+          <div class="burn-stat"><span class="k">Proyeksi akhir bulan</span><span class="v">${formatRupiah(b.projectedTotal)}</span></div>
+          <div class="burn-stat"><span class="k">Hari berjalan</span><span class="v">${b.today} / ${b.daysInMonth}</span></div>
+          <div class="burn-status ${b.status}">${statusText}</div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="stat-grid">
+        <div class="summary-card"><div class="label">Pemasukan</div><div class="value num">${formatRupiah(totalIncome())}</div></div>
+        <div class="summary-card"><div class="label">Terpakai Bulan Ini</div><div class="value num">${formatRupiah(totalTerpakaiBulanIni)}</div></div>
+        <div class="summary-card"><div class="label">Disisihkan Bulan Ini</div><div class="value ok num">${formatRupiah(depositBulanIni)}</div></div>
+        <div class="summary-card"><div class="label">Sisa Belum Terpakai</div><div class="value ${sisa < 0 ? 'warn' : ''} num">${formatRupiah(sisa)}</div></div>
+      </div>
+
+      <div class="stat-section">
+        <h3>Alokasi Rencana</h3>
+        <p class="stat-desc">Pembagian persentase pemasukan bulanan ke tiap kantong.</p>
+        <div class="alloc-bar">${allocBarHtml}</div>
+        <div class="alloc-legend" style="margin-bottom:14px;">${allocLegendHtml}</div>
+        ${renderDonutSVG(segs.filter(s => s.pct > 0).map(s => ({ value: s.pct, color: s.color })), 170)}
+      </div>
+
+      <div class="stat-section">
+        <h3>Tren Harian — ${MONTHS_FULL[new Date().getMonth()]} ${new Date().getFullYear()}</h3>
+        <p class="stat-desc">Pengeluaran Kebutuhan Pokok, Tambahan, dan Cicilan per hari bulan ini.</p>
+        ${renderDailyTrendChart()}
+      </div>
+
+      <div class="stat-section">
+        <h3>Tren Bulanan</h3>
+        <p class="stat-desc">Total pengeluaran per bulan (maksimal 12 bulan terakhir).</p>
+        ${renderMonthlyTrendChart()}
+      </div>
+
+      <div class="stat-section">
+        <h3>Tren Tahunan</h3>
+        <p class="stat-desc">Total pengeluaran per tahun dari seluruh riwayat yang tercatat.</p>
+        ${renderYearlyTrendChart()}
+      </div>
+
+      <div class="stat-section">
+        <h3>Rencana vs Realisasi</h3>
+        <p class="stat-desc">Perbandingan target bulanan dengan yang benar-benar terpakai atau terkumpul.</p>
+        ${compareRow('#1B4332', 'Kebutuhan Pokok', pokokSp, pokokTg, 'terpakai')}
+        ${compareRow('#B8862E', 'Kebutuhan Tambahan', tambahanSp, tambahanTg, 'terpakai')}
+        ${state.utang.enabled ? compareRow('#7A6C5D', 'Cicilan / Utang', utangSp, utangTg, 'terpakai') : ''}
+        ${compareRow('#A8443E', 'Dana Darurat', dSaldo, dTarget, 'terkumpul')}
+        ${compareRow('#4C7A5B', 'Tabungan Tujuan', tabunganSd, tabunganGoalsTarget, 'terkumpul')}
+        ${compareRow('#5B4E8A', 'Investasi', investasiSd, 0, 'terkumpul')}
+      </div>
+
+      <div class="stat-section">
+        <h3>Kecepatan Pengeluaran</h3>
+        <p class="stat-desc">Proyeksi total pengeluaran akhir bulan berdasarkan kebiasaan bulan ini.</p>
+        <div class="burn-grid">
+          ${burnCardHtml('Kebutuhan Pokok', burnPokok)}
+          ${burnCardHtml('Kebutuhan Tambahan', burnTambahan)}
+        </div>
+      </div>
+
+      <div class="stat-section">
+        <h3>Rasio Kesehatan Keuangan</h3>
+        <p class="stat-desc">Tiga rasio yang umum dipakai untuk menilai kesehatan keuangan rumah tangga.</p>
+        <div class="ratio-grid">
+          <div class="burn-card">
+            <div class="name">Rasio Dana Darurat</div>
+            <div class="burn-stat"><span class="k">Aset likuid</span><span class="v">${formatRupiah(asetLikuid)}</span></div>
+            <div class="burn-stat"><span class="k">Pengeluaran/bulan</span><span class="v">${formatRupiah(totalTerpakaiBulanIni)}</span></div>
+            <div class="burn-stat"><span class="k">Setara</span><span class="v">${rasioDaruratBulan.toFixed(1)} bulan</span></div>
+            <div class="burn-status ${daruratStatus.cls}">${daruratStatus.label} (ideal ≥ 6 bulan)</div>
+          </div>
+          <div class="burn-card">
+            <div class="name">DSR (Cicilan/Pendapatan)</div>
+            <div class="burn-stat"><span class="k">Cicilan bulan ini</span><span class="v">${formatRupiah(state.utang.enabled ? utangSp : 0)}</span></div>
+            <div class="burn-stat"><span class="k">Pendapatan</span><span class="v">${formatRupiah(totalIncome())}</span></div>
+            <div class="burn-stat"><span class="k">DSR</span><span class="v">${dsr.toFixed(1)}%</span></div>
+            <div class="burn-status ${dsrStatus.cls}">${dsrStatus.label} (aman ≤ 30%)</div>
+          </div>
+          <div class="burn-card">
+            <div class="name">Rasio Tabungan</div>
+            <div class="burn-stat"><span class="k">Tabungan+Investasi/bln</span><span class="v">${formatRupiah(tabunganDepositBulanIni + investasiDepositBulanIni)}</span></div>
+            <div class="burn-stat"><span class="k">Pendapatan</span><span class="v">${formatRupiah(totalIncome())}</span></div>
+            <div class="burn-stat"><span class="k">Rasio</span><span class="v">${rasioTabungan.toFixed(1)}%</span></div>
+            <div class="burn-status ${tabunganStatus.cls}">${tabunganStatus.label} (ideal ≥ 20%)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-section">
+        <h3>Diversifikasi Investasi</h3>
+        <p class="stat-desc">Sebaran dana investasi berdasarkan jenis instrumen.</p>
+        ${instrTotal > 0 ? `<div class="alloc-bar">${instrBarHtml}</div><div class="alloc-legend">${instrLegendHtml}</div>` : '<p class="empty-stat">Belum ada catatan investasi.</p>'}
+      </div>
+    `;
+  }
+
+  function getMonthFlowTransactions(year, month) {
+    const items = [];
+    const sources = [
+      { key: 'pokok', label: 'Kebutuhan Pokok', color: '#1B4332' },
+      { key: 'tambahan', label: 'Kebutuhan Tambahan', color: '#B8862E' },
+    ];
+    if (state.utang.enabled) sources.push({ key: 'utang', label: 'Cicilan/Utang', color: '#7A6C5D' });
+    sources.forEach(src => {
+      state[src.key].transactions.forEach(t => {
+        const d = new Date(t.date);
+        if (!isNaN(d) && d.getFullYear() === year && d.getMonth() === month) {
+          items.push({ id: t.id, cat: src.key, label: src.label, color: src.color, note: t.note, amount: t.amount, date: t.date });
+        }
+      });
+    });
+    items.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return items;
+  }
+
+  function dailyTotals(year, month) {
+    const totals = {};
+    getMonthFlowTransactions(year, month).forEach(t => {
+      const key = new Date(t.date).toISOString().slice(0, 10);
+      totals[key] = (totals[key] || 0) + t.amount;
+    });
+    return totals;
+  }
+
+  function renderHarianView() {
+    const year = uiState.harianYear;
+    const month = uiState.harianMonth;
+    const totals = dailyTotals(year, month);
+    const maxDay = Math.max(1, ...Object.values(totals));
+    const firstDow = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < firstDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+    const calGridHtml = cells.map(d => {
+      if (d === null) return '<div class="cal-cell cal-empty"></div>';
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const total = totals[dateStr] || 0;
+      const intensity = total > 0 ? Math.min(1, total / maxDay) : 0;
+      const selected = uiState.harianSelectedDate === dateStr;
+      return `<button class="cal-cell ${selected ? 'cal-selected' : ''}" data-action="select-day" data-date="${dateStr}" style="--fill-opacity:${0.12 + intensity * 0.55}">
+        <span class="cal-day-num">${d}</span>
+        ${total > 0 ? `<span class="cal-day-total num">${formatRupiah(total)}</span>` : ''}
+      </button>`;
+    }).join('');
+
+    const filterDate = uiState.harianSelectedDate;
+    const listItems = getMonthFlowTransactions(year, month).filter(t => !filterDate || new Date(t.date).toISOString().slice(0, 10) === filterDate);
+    const listHtml = listItems.length === 0 ? '<p class="empty-stat">Belum ada catatan.</p>' : listItems.map(t => `
+      <li>
+        <span class="tx-date-badge num">${formatDateShort(t.date)}</span>
+        <span class="chip" style="background:${t.color};color:#fff;">${t.label}</span>
+        <span class="note">${escapeHtml(t.note || '(tanpa catatan)')}</span>
+        <span class="amt num">${formatRupiah(t.amount)}</span>
+        <button data-action="del-harian-tx" data-cat="${t.cat}" data-id="${t.id}" title="Hapus">✕</button>
+      </li>
+    `).join('');
+
+    const totalMonth = Object.values(totals).reduce((s, v) => s + v, 0);
+    const catOptions = [`<option value="pokok">Kebutuhan Pokok</option>`, `<option value="tambahan">Kebutuhan Tambahan</option>`];
+    if (state.utang.enabled) catOptions.push(`<option value="utang">Cicilan/Utang</option>`);
+
+    return `
+      <div class="stat-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <button class="reset-btn" data-action="harian-prev-month">← Bulan Lalu</button>
+          <h3 style="margin:0;">${MONTHS_FULL[month]} ${year}</h3>
+          <button class="reset-btn" data-action="harian-next-month">Bulan Depan →</button>
+        </div>
+        <p class="stat-desc">Total pengeluaran bulan ini: <b class="num">${formatRupiah(totalMonth)}</b>. Klik tanggal untuk melihat rincian hari itu.</p>
+        <div class="cal-weekdays">
+          <span>Min</span><span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span>
+        </div>
+        <div class="cal-grid">${calGridHtml}</div>
+        ${filterDate ? `<button class="calc-toggle" data-action="clear-day-filter" style="margin-top:10px;">✕ Lihat semua tanggal (${MONTHS_FULL[month]})</button>` : ''}
+      </div>
+
+      <div class="stat-section">
+        <h3>Catat Pengeluaran Harian</h3>
+        <p class="stat-desc">Cara cepat mencatat pengeluaran hari ke hari tanpa harus buka kartu Kantong satu-satu.</p>
+        <div class="add-tx">
+          <input class="tx-date" type="date" id="harian-date" value="${filterDate || todayStr()}">
+          <select id="harian-cat">${catOptions.join('')}</select>
+          <input class="note" type="text" placeholder="Catatan" id="harian-note">
+          <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Jumlah" id="harian-amount">
+          <button data-action="add-harian-tx">+</button>
+        </div>
+      </div>
+
+      <div class="stat-section">
+        <h3>${filterDate ? 'Rincian ' + formatDateLong(filterDate) : 'Semua Catatan Bulan Ini'}</h3>
+        <ul class="tx-list" style="max-height:260px;">${listHtml}</ul>
+      </div>
+    `;
+  }
+
+  function attachHarianEvents() {
+    const prevBtn = root.querySelector('[data-action="harian-prev-month"]');
+    if (prevBtn) prevBtn.addEventListener('click', () => {
+      uiState.harianMonth--;
+      if (uiState.harianMonth < 0) { uiState.harianMonth = 11; uiState.harianYear--; }
+      uiState.harianSelectedDate = null;
+      render();
+    });
+    const nextBtn = root.querySelector('[data-action="harian-next-month"]');
+    if (nextBtn) nextBtn.addEventListener('click', () => {
+      uiState.harianMonth++;
+      if (uiState.harianMonth > 11) { uiState.harianMonth = 0; uiState.harianYear++; }
+      uiState.harianSelectedDate = null;
+      render();
+    });
+    root.querySelectorAll('[data-action="select-day"]').forEach(el => {
+      el.addEventListener('click', () => {
+        const date = el.getAttribute('data-date');
+        uiState.harianSelectedDate = (uiState.harianSelectedDate === date) ? null : date;
+        render();
+      });
+    });
+    const clearFilter = root.querySelector('[data-action="clear-day-filter"]');
+    if (clearFilter) clearFilter.addEventListener('click', () => { uiState.harianSelectedDate = null; render(); });
+
+    const addBtn = root.querySelector('[data-action="add-harian-tx"]');
+    if (addBtn) addBtn.addEventListener('click', async () => {
+      const dateInput = document.getElementById('harian-date');
+      const catInput = document.getElementById('harian-cat');
+      const noteInput = document.getElementById('harian-note');
+      const amountInput = document.getElementById('harian-amount');
+      const amount = parseMoneyString(amountInput.value);
+      if (!amount || amount <= 0) { amountInput.focus(); return; }
+      state[catInput.value].transactions.push({ id: uid(), note: noteInput.value.trim(), amount, date: dateInput.value || todayStr() });
+      render(); await saveState();
+    });
+    root.querySelectorAll('[data-action="del-harian-tx"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const cat = e.currentTarget.getAttribute('data-cat');
+        const id = e.currentTarget.getAttribute('data-id');
+        state[cat].transactions = state[cat].transactions.filter(t => t.id !== id);
+        render(); await saveState();
+      });
+    });
+  }
+
+  function buildMonthlyRows() {
+    const rows = state.history.map(r => ({
+      year: r.year, month: r.month,
+      income: r.income, pokok: r.pokokSpent, tambahan: r.tambahanSpent, utang: r.utangSpent || 0,
+      darurat: r.daruratDeposit - r.daruratWithdraw, tabungan: r.tabunganDeposit, investasi: r.investasiDeposit,
+      isCurrent: false
+    }));
+    const now = new Date();
+    const curYear = now.getFullYear(), curMonth = now.getMonth();
+    const alreadyArchived = rows.some(r => r.year === curYear && r.month === curMonth);
+    if (!alreadyArchived) {
+      const daruratDep = state.darurat.transactions.filter(t => isThisMonth(t.date) && t.type !== 'out').reduce((s, t) => s + t.amount, 0);
+      const daruratWd = state.darurat.transactions.filter(t => isThisMonth(t.date) && t.type === 'out').reduce((s, t) => s + t.amount, 0);
+      const tabunganDep = state.tabungan.goals.reduce((s, g) => s + g.transactions.filter(t => isThisMonth(t.date)).reduce((ss, t) => ss + t.amount, 0), 0);
+      const investasiDep = state.investasi.transactions.filter(t => isThisMonth(t.date)).reduce((s, t) => s + t.amount, 0);
+      rows.push({
+        year: curYear, month: curMonth,
+        income: totalIncome(), pokok: pokokSpent(), tambahan: tambahanSpent(), utang: state.utang.enabled ? utangSpent() : 0,
+        darurat: daruratDep - daruratWd, tabungan: tabunganDep, investasi: investasiDep,
+        isCurrent: true
+      });
+    }
+    rows.sort((a, b) => (b.year - a.year) || (b.month - a.month));
+    return rows.map(r => {
+      const totalPengeluaran = r.pokok + r.tambahan + r.utang;
+      const totalDisisihkan = r.darurat + r.tabungan + r.investasi;
+      return Object.assign({}, r, {
+        totalPengeluaran, totalDisisihkan,
+        sisa: r.income - totalPengeluaran - totalDisisihkan,
+        label: MONTHS_FULL[r.month] + ' ' + r.year
+      });
+    });
+  }
+
+  function buildYearlyRows(monthlyRows) {
+    const byYear = {};
+    monthlyRows.forEach(r => {
+      if (!byYear[r.year]) byYear[r.year] = { year: r.year, income: 0, pokok: 0, tambahan: 0, utang: 0, darurat: 0, tabungan: 0, investasi: 0, totalPengeluaran: 0, totalDisisihkan: 0, sisa: 0, months: 0 };
+      const y = byYear[r.year];
+      y.income += r.income; y.pokok += r.pokok; y.tambahan += r.tambahan; y.utang += r.utang;
+      y.darurat += r.darurat; y.tabungan += r.tabungan; y.investasi += r.investasi;
+      y.totalPengeluaran += r.totalPengeluaran; y.totalDisisihkan += r.totalDisisihkan; y.sisa += r.sisa; y.months++;
+    });
+    return Object.values(byYear).sort((a, b) => b.year - a.year);
+  }
+
+  function downloadCSV(rows, filename, isYearly) {
+    const headers = [isYearly ? 'Tahun' : 'Bulan', 'Pemasukan', 'Kebutuhan Pokok', 'Kebutuhan Tambahan', 'Cicilan', 'Total Pengeluaran', 'Setoran Darurat', 'Setoran Tabungan', 'Setoran Investasi', 'Total Disisihkan', 'Sisa'];
+    const lines = [headers.join(',')];
+    rows.forEach(r => {
+      const first = isYearly ? r.year : r.label;
+      lines.push([first, r.income, r.pokok, r.tambahan, r.utang, r.totalPengeluaran, r.darurat, r.tabungan, r.investasi, r.totalDisisihkan, r.sisa].join(','));
+    });
+    const csv = '\uFEFF' + lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function renderTabelView() {
+    const monthlyRows = buildMonthlyRows();
+    const yearlyRows = buildYearlyRows(monthlyRows);
+
+    const monthlyTableHtml = monthlyRows.length === 0 ? '<p class="empty-stat">Belum ada data bulan yang tercatat.</p>' : `
+      <div class="table-scroll">
+        <table class="stat-table">
+          <thead><tr>
+            <th>Bulan</th><th>Pemasukan</th><th>Pokok</th><th>Tambahan</th><th>Cicilan</th>
+            <th>Total Pengeluaran</th><th>Darurat</th><th>Tabungan</th><th>Investasi</th><th>Total Disisihkan</th><th>Sisa</th>
+          </tr></thead>
+          <tbody>
+            ${monthlyRows.map(r => `
+              <tr>
+                <td>${r.label}${r.isCurrent ? ' <span class="chip" style="background:var(--gold);color:#fff;">berjalan</span>' : ''}</td>
+                <td class="num">${formatRupiah(r.income)}</td>
+                <td class="num">${formatRupiah(r.pokok)}</td>
+                <td class="num">${formatRupiah(r.tambahan)}</td>
+                <td class="num">${formatRupiah(r.utang)}</td>
+                <td class="num">${formatRupiah(r.totalPengeluaran)}</td>
+                <td class="num">${formatRupiah(r.darurat)}</td>
+                <td class="num">${formatRupiah(r.tabungan)}</td>
+                <td class="num">${formatRupiah(r.investasi)}</td>
+                <td class="num">${formatRupiah(r.totalDisisihkan)}</td>
+                <td class="num" style="${r.sisa < 0 ? 'color:var(--brick);font-weight:700;' : ''}">${formatRupiah(r.sisa)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    const yearlyTableHtml = yearlyRows.length === 0 ? '<p class="empty-stat">Belum ada data tahun yang tercatat.</p>' : `
+      <div class="table-scroll">
+        <table class="stat-table">
+          <thead><tr>
+            <th>Tahun</th><th>Bulan Tercatat</th><th>Pemasukan</th><th>Pokok</th><th>Tambahan</th><th>Cicilan</th>
+            <th>Total Pengeluaran</th><th>Darurat</th><th>Tabungan</th><th>Investasi</th><th>Total Disisihkan</th><th>Sisa</th>
+          </tr></thead>
+          <tbody>
+            ${yearlyRows.map(r => `
+              <tr>
+                <td>${r.year}</td>
+                <td class="num">${r.months}</td>
+                <td class="num">${formatRupiah(r.income)}</td>
+                <td class="num">${formatRupiah(r.pokok)}</td>
+                <td class="num">${formatRupiah(r.tambahan)}</td>
+                <td class="num">${formatRupiah(r.utang)}</td>
+                <td class="num">${formatRupiah(r.totalPengeluaran)}</td>
+                <td class="num">${formatRupiah(r.darurat)}</td>
+                <td class="num">${formatRupiah(r.tabungan)}</td>
+                <td class="num">${formatRupiah(r.investasi)}</td>
+                <td class="num">${formatRupiah(r.totalDisisihkan)}</td>
+                <td class="num" style="${r.sisa < 0 ? 'color:var(--brick);font-weight:700;' : ''}">${formatRupiah(r.sisa)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    return `
+      <div class="stat-section">
+        <h3>Tabel Bulanan</h3>
+        <p class="stat-desc">Bulan "berjalan" dihitung langsung dari data saat ini. Klik "Tutup Bulan Ini" di halaman Kantong supaya bulan tersebut resmi masuk arsip.</p>
+        ${monthlyTableHtml}
+        <button class="close-month-btn" data-action="download-monthly-csv" style="margin-top:10px;">⬇ Unduh CSV Bulanan (buka di Excel)</button>
+      </div>
+      <div class="stat-section">
+        <h3>Tabel Tahunan</h3>
+        <p class="stat-desc">Rekap seluruh bulan yang sudah tercatat, dikelompokkan per tahun.</p>
+        ${yearlyTableHtml}
+        <button class="close-month-btn" data-action="download-yearly-csv">⬇ Unduh CSV Tahunan (buka di Excel)</button>
+      </div>
+    `;
+  }
+
+  function attachTabelEvents() {
+    const monthlyBtn = root.querySelector('[data-action="download-monthly-csv"]');
+    if (monthlyBtn) monthlyBtn.addEventListener('click', () => {
+      downloadCSV(buildMonthlyRows(), 'kantong-keuangan-bulanan.csv', false);
+    });
+    const yearlyBtn = root.querySelector('[data-action="download-yearly-csv"]');
+    if (yearlyBtn) yearlyBtn.addEventListener('click', () => {
+      downloadCSV(buildYearlyRows(buildMonthlyRows()), 'kantong-keuangan-tahunan.csv', true);
+    });
+  }
+
+  function toRoman(num) {
+    const map = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+    let result = '';
+    for (const [val, sym] of map) { while (num >= val) { result += sym; num -= val; } }
+    return result || 'I';
+  }
+  function formatRABNumber(n, showDecimals) {
+    n = Number(n) || 0;
+    return showDecimals
+      ? n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : n.toLocaleString('id-ID');
+  }
+  const PLAN_CATEGORIES = {
+    umum: { label: 'Umum', title: 'RENCANA ANGGARAN', projectLabel: 'Nama Rencana', uraian: 'URAIAN KEBUTUHAN', volLabel: 'JUMLAH', namePlaceholder: 'Nama item (mis. Sewa sound system)', qtyLabel: 'Jumlah', useDetailFields: false },
+    proyek: { label: 'Proyek / Bangunan', title: 'RENCANA ANGGARAN BIAYA (RAB)', projectLabel: 'Proyek', uraian: 'URAIAN PEKERJAAN', volLabel: 'VOL.', namePlaceholder: 'Nama pekerjaan (mis. Pemasangan bouwplank)', qtyLabel: 'Volume', useDetailFields: true },
+    masak: { label: 'Masak / Acara Makan', title: 'RENCANA ANGGARAN BELANJA MASAK', projectLabel: 'Acara / Menu', uraian: 'NAMA BAHAN', volLabel: 'JUMLAH', namePlaceholder: 'Nama bahan (mis. Kecap manis)', qtyLabel: 'Jumlah', useDetailFields: false },
+    belanja: { label: 'Belanja', title: 'RENCANA ANGGARAN BELANJA', projectLabel: 'Keperluan Belanja', uraian: 'NAMA BARANG', volLabel: 'JUMLAH', namePlaceholder: 'Nama barang (mis. Sabun cuci piring)', qtyLabel: 'Jumlah', useDetailFields: false },
+    liburan: { label: 'Liburan / Trip', title: 'RENCANA ANGGARAN LIBURAN', projectLabel: 'Tujuan Liburan', uraian: 'URAIAN KEBUTUHAN', volLabel: 'JUMLAH', namePlaceholder: 'Nama kebutuhan (mis. Tiket pesawat)', qtyLabel: 'Jumlah', useDetailFields: false },
+    sekolah: { label: 'Sekolah / Pendidikan', title: 'RENCANA ANGGARAN SEKOLAH', projectLabel: 'Keperluan Sekolah', uraian: 'URAIAN KEBUTUHAN', volLabel: 'JUMLAH', namePlaceholder: 'Nama kebutuhan (mis. Buku tulis)', qtyLabel: 'Jumlah', useDetailFields: false },
+    utang: { label: 'Utang / Cicilan', title: 'RENCANA PELUNASAN UTANG', projectLabel: 'Nama Utang / Pinjaman', uraian: 'URAIAN', volLabel: 'JUMLAH', namePlaceholder: 'Nama utang/cicilan (mis. Cicilan motor)', qtyLabel: 'Jumlah', useDetailFields: false },
+  };
+  function planCategoryInfo(plan) {
+    return PLAN_CATEGORIES[plan.category] || PLAN_CATEGORIES.umum;
+  }
+
+  function buildRABHtml(plan) {
+    const catInfo = planCategoryInfo(plan);
+    const showSat = catInfo.useDetailFields;
+    const showDecimals = catInfo.useDetailFields;
+    const groups = [];
+    const groupIndex = {};
+    plan.items.forEach(it => {
+      const key = (it.section || 'Umum').trim() || 'Umum';
+      if (!(key in groupIndex)) {
+        groupIndex[key] = groups.length;
+        groups.push({ name: key, items: [] });
+      }
+      groups[groupIndex[key]].items.push(it);
+    });
+    let grandTotal = 0;
+    let rowCounter = 0;
+    const useGrouping = groups.length > 1 || (groups.length === 1 && groups[0].name.toLowerCase() !== 'umum');
+    const sectionColspan = showSat ? 4 : 3;
+    const grandColspan = showSat ? 5 : 4;
+    function itemRowHtml(it, ii) {
+      const jumlah = (Number(it.qty) || 0) * (Number(it.price) || 0);
+      const altClass = rowCounter % 2 === 1 ? 'rab-item-row-alt' : '';
+      rowCounter++;
+      return `
+        <tr class="${altClass}">
+          <td class="rab-c">${ii + 1}</td>
+          <td>${escapeHtml(it.name)}</td>
+          <td class="rab-c">${it.qty}</td>
+          ${showSat ? `<td class="rab-c">${escapeHtml(it.unit || '-')}</td>` : ''}
+          <td class="rab-r">${formatRABNumber(it.price, showDecimals)}</td>
+          <td class="rab-r">${formatRABNumber(jumlah, showDecimals)}</td>
+        </tr>
+      `;
+    }
+    let rowsHtml;
+    if (useGrouping) {
+      rowsHtml = groups.map((g, gi) => {
+        const roman = toRoman(gi + 1);
+        const subtotal = g.items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+        grandTotal += subtotal;
+        const itemRows = g.items.map((it, ii) => itemRowHtml(it, ii)).join('');
+        return `
+          <tr class="rab-section-row">
+            <td class="rab-c"><b>${roman}</b></td>
+            <td colspan="${sectionColspan}"><b>${escapeHtml(g.name.toUpperCase())}</b></td>
+            <td class="rab-r"><b>Rp ${formatRABNumber(subtotal, showDecimals)}</b></td>
+          </tr>
+          ${itemRows}
+        `;
+      }).join('');
+    } else {
+      const flatItems = groups.length > 0 ? groups[0].items : [];
+      rowsHtml = flatItems.map((it, ii) => {
+        grandTotal += (Number(it.qty) || 0) * (Number(it.price) || 0);
+        return itemRowHtml(it, ii);
+      }).join('');
+    }
+
+    const colUraian = showSat ? '38%' : '46%';
+    const colVol = showSat ? '9%' : '11%';
+    const colSat = '8%';
+    const colHarga = showSat ? '20%' : '21%';
+    const colJumlah = showSat ? '20%' : '21%';
+
+    return `
+      <div class="rab-doc">
+        <h1 class="rab-title">${catInfo.title}</h1>
+        <p class="rab-subtitle">Dibuat dengan Kantong Keuangan</p>
+        <table class="rab-info">
+          <tr><td>${catInfo.projectLabel}</td><td>:</td><td>${escapeHtml(plan.name)}</td></tr>
+          ${plan.location ? `<tr><td>Lokasi</td><td>:</td><td>${escapeHtml(plan.location)}</td></tr>` : ''}
+          ${plan.owner ? `<tr><td>Pemilik / PJ</td><td>:</td><td>${escapeHtml(plan.owner)}</td></tr>` : ''}
+          <tr><td>Tanggal</td><td>:</td><td>${formatDateLong(plan.createdAt)}</td></tr>
+        </table>
+        <table class="rab-table">
+          <colgroup>
+            <col style="width:6%;">
+            <col style="width:${colUraian};">
+            <col style="width:${colVol};">
+            ${showSat ? `<col style="width:${colSat};">` : ''}
+            <col style="width:${colHarga};">
+            <col style="width:${colJumlah};">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>NO</th>
+              <th>${catInfo.uraian}</th>
+              <th>${catInfo.volLabel}</th>
+              ${showSat ? '<th>SAT.</th>' : ''}
+              <th>HARGA SATUAN</th>
+              <th>JUMLAH HARGA</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+            <tr class="rab-grand-row">
+              <td colspan="${grandColspan}" class="rab-r"><b>JUMLAH TOTAL</b></td>
+              <td class="rab-r"><b>Rp ${formatRABNumber(grandTotal, showDecimals)}</b></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function planItemActual(item) {
+    const est = (Number(item.qty) || 0) * (Number(item.price) || 0);
+    return item.done && item.actual != null && item.actual !== '' ? Number(item.actual) : est;
+  }
+  function planTotals(plan) {
+    const estimasi = plan.items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+    const realisasi = plan.items.reduce((s, it) => s + planItemActual(it), 0);
+    const doneCount = plan.items.filter(it => it.done).length;
+    return { estimasi, realisasi, doneCount, totalCount: plan.items.length };
+  }
+
+  function renderRencanaView() {
+    const plans = state.budgetPlans;
+    const cardsHtml = plans.length === 0 ? '<p class="empty-stat">Belum ada rencana anggaran. Buat satu untuk acara seperti camping, masak untuk tamu, renovasi kecil, dll.</p>' : plans.map(plan => {
+      const isOpen = uiState.openPlanId === plan.id;
+      const { estimasi, realisasi, doneCount, totalCount } = planTotals(plan);
+      const pctDone = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
+      let body = '';
+      if (isOpen) {
+        const catInfo = planCategoryInfo(plan);
+        const itemsHtml = plan.items.length === 0 ? '<li class="tx-empty">Belum ada item</li>' : plan.items.map(it => {
+          const subtotal = (Number(it.qty) || 0) * (Number(it.price) || 0);
+          const qtyDisplay = catInfo.useDetailFields ? `${it.qty}${it.unit ? ' ' + escapeHtml(it.unit) : ''} ×` : `${it.qty}×`;
+          return `
+            <li class="plan-item ${it.done ? 'plan-item-done' : ''}">
+              <input type="checkbox" data-action="toggle-plan-item" data-plan="${plan.id}" data-item="${it.id}" ${it.done ? 'checked' : ''}>
+              <span class="plan-item-name">${it.section ? `<span class="chip" style="background:var(--sage);color:#fff;">${escapeHtml(it.section)}</span> ` : ''}${escapeHtml(it.name)} <span class="plan-item-qty num">(${qtyDisplay} ${formatRupiah(it.price)} = ${formatRupiah(subtotal)})</span></span>
+              ${it.done ? `<input class="plan-actual-input num money-input" type="text" inputmode="numeric" placeholder="Harga aktual" data-action="set-plan-actual" data-plan="${plan.id}" data-item="${it.id}" value="${it.actual != null ? formatMoneyString(it.actual) : ''}">` : ''}
+              <button data-action="del-plan-item" data-plan="${plan.id}" data-item="${it.id}" title="Hapus">✕</button>
+            </li>
+          `;
+        }).join('');
+        const itemForm = catInfo.useDetailFields ? `
+          <div class="add-tx">
+            <input class="note" type="text" placeholder="Bagian (mis. Pekerjaan Persiapan)" data-role="plan-item-section-${plan.id}">
+            <input class="note" type="text" placeholder="${catInfo.namePlaceholder}" data-role="plan-item-name-${plan.id}">
+          </div>
+          <div class="add-tx">
+            <input class="calc-qty num" type="number" placeholder="${catInfo.qtyLabel}" value="1" data-role="plan-item-qty-${plan.id}">
+            <input class="note" type="text" placeholder="Satuan (mis. unit, m2, ls)" data-role="plan-item-unit-${plan.id}" style="max-width:120px;">
+            <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Harga satuan" data-role="plan-item-price-${plan.id}">
+            <button data-action="add-plan-item" data-plan="${plan.id}">+</button>
+          </div>
+        ` : `
+          <div class="add-tx">
+            <input class="note" type="text" placeholder="${catInfo.namePlaceholder}" data-role="plan-item-name-${plan.id}">
+            <input class="calc-qty num" type="number" placeholder="${catInfo.qtyLabel}" value="1" data-role="plan-item-qty-${plan.id}" style="max-width:80px;">
+            <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Harga" data-role="plan-item-price-${plan.id}">
+            <button data-action="add-plan-item" data-plan="${plan.id}">+</button>
+          </div>
+        `;
+        body = `
+          <ul class="tx-list plan-item-list">${itemsHtml}</ul>
+          ${itemForm}
+          <div class="plan-summary">
+            <div><span class="k">Estimasi Total</span><span class="v num">${formatRupiah(estimasi)}</span></div>
+            <div><span class="k">Realisasi (tercatat)</span><span class="v num">${formatRupiah(realisasi)}</span></div>
+            <div><span class="k">Selisih</span><span class="v num" style="${realisasi > estimasi ? 'color:var(--brick)' : 'color:var(--sage)'}">${formatRupiah(estimasi - realisasi)}</span></div>
+          </div>
+          <div class="plan-record-row">
+            <select data-role="plan-target-cat-${plan.id}">
+              <option value="tambahan">Catat ke Kebutuhan Tambahan</option>
+              <option value="pokok">Catat ke Kebutuhan Pokok</option>
+            </select>
+            <button class="calc-use-btn" data-action="record-plan-total" data-plan="${plan.id}">Catat Realisasi sebagai Pengeluaran</button>
+          </div>
+          <button class="calc-toggle" data-action="print-plan-rab" data-plan="${plan.id}" style="margin-top:10px;">🖨️ Cetak / Unduh PDF</button>
+        `;
+      }
+      return `
+        <div class="envelope plan-card">
+          <div class="envelope-body">
+            <div class="plan-head" data-action="toggle-plan-open" data-plan="${plan.id}">
+              <div>
+                <p class="envelope-name">${escapeHtml(plan.name)}</p>
+                <p class="envelope-desc"><span class="chip" style="background:var(--forest);color:#fff;">${planCategoryInfo(plan).label}</span> ${plan.location ? escapeHtml(plan.location) + ' · ' : ''}${totalCount} item · ${formatRupiah(estimasi)} estimasi</p>
+              </div>
+              <button class="reset-btn" data-action="del-plan" data-plan="${plan.id}" title="Hapus rencana">✕</button>
+            </div>
+            ${totalCount > 0 ? `<div class="env-bar-track"><div class="env-bar-fill" style="width:${pctDone}%; background:var(--gold)"></div></div><p class="sisa-line">${doneCount}/${totalCount} item sudah dibeli/selesai</p>` : ''}
+            <button class="calc-toggle" data-action="toggle-plan-open" data-plan="${plan.id}">${isOpen ? '▲ Sembunyikan detail' : '▼ Lihat & isi rincian'}</button>
+            ${body}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="stat-section">
+        <h3>Rencana Anggaran</h3>
+        <p class="stat-desc">Buat rencana biaya untuk kegiatan tertentu — masak, belanja, liburan, sekolah, pelunasan utang, proyek bangunan, dll — terpisah dari kantong bulanan. Rincikan item, tandai yang sudah dibeli, lalu catat totalnya sebagai pengeluaran atau cetak sebagai PDF.</p>
+        <button class="add-goal-btn" data-action="toggle-add-plan">${uiState.addPlanOpen ? '✕ Batal' : '+ Buat Rencana Baru'}</button>
+        ${uiState.addPlanOpen ? `
+          <div class="calc-panel" style="margin-top:8px;">
+            <div class="add-tx">
+              <select id="new-plan-category">
+                ${Object.entries(PLAN_CATEGORIES).map(([key, c]) => `<option value="${key}">${c.label}</option>`).join('')}
+              </select>
+              <input class="note" type="text" placeholder="Nama rencana (mis. Camping Agustus)" id="new-plan-name">
+            </div>
+            <div class="add-tx">
+              <input class="note" type="text" placeholder="Lokasi (opsional)" id="new-plan-location">
+              <input class="note" type="text" placeholder="Pemilik/Penanggung jawab (opsional)" id="new-plan-owner">
+            </div>
+            <div class="add-tx">
+              <input class="note" type="text" placeholder="Catatan (opsional)" id="new-plan-note">
+              <button data-action="confirm-add-plan">Buat</button>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+      <div class="stairs">${cardsHtml}</div>
+    `;
+  }
+
+  function attachRencanaEvents() {
+    const toggleAddPlan = root.querySelector('[data-action="toggle-add-plan"]');
+    if (toggleAddPlan) toggleAddPlan.addEventListener('click', () => { uiState.addPlanOpen = !uiState.addPlanOpen; render(); });
+    const confirmAddPlan = root.querySelector('[data-action="confirm-add-plan"]');
+    if (confirmAddPlan) confirmAddPlan.addEventListener('click', async () => {
+      const nameInput = document.getElementById('new-plan-name');
+      const categoryInput = document.getElementById('new-plan-category');
+      const locationInput = document.getElementById('new-plan-location');
+      const ownerInput = document.getElementById('new-plan-owner');
+      const noteInput = document.getElementById('new-plan-note');
+      const name = nameInput.value.trim();
+      if (!name) { nameInput.focus(); return; }
+      const plan = {
+        id: uid(), name,
+        category: categoryInput ? categoryInput.value : 'umum',
+        location: locationInput.value.trim(),
+        owner: ownerInput.value.trim(),
+        note: noteInput.value.trim(),
+        createdAt: new Date().toISOString(), items: []
+      };
+      state.budgetPlans.unshift(plan);
+      uiState.addPlanOpen = false;
+      uiState.openPlanId = plan.id;
+      render(); await saveState();
+    });
+
+    root.querySelectorAll('[data-action="toggle-plan-open"]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-action="del-plan"]')) return;
+        const planId = e.currentTarget.getAttribute('data-plan');
+        uiState.openPlanId = (uiState.openPlanId === planId) ? null : planId;
+        render();
+      });
+    });
+
+    root.querySelectorAll('[data-action="del-plan"]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const planId = e.currentTarget.getAttribute('data-plan');
+        uiState.confirmModal = {
+          message: 'Hapus rencana anggaran ini beserta seluruh itemnya?',
+          confirmLabel: 'Ya, hapus',
+          onConfirm: async () => {
+            state.budgetPlans = state.budgetPlans.filter(p => p.id !== planId);
+            if (uiState.openPlanId === planId) uiState.openPlanId = null;
+            await saveState();
+          }
+        };
+        render();
+      });
+    });
+
+    root.querySelectorAll('[data-action="add-plan-item"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const planId = e.currentTarget.getAttribute('data-plan');
+        const sectionInput = root.querySelector(`[data-role="plan-item-section-${planId}"]`);
+        const nameInput = root.querySelector(`[data-role="plan-item-name-${planId}"]`);
+        const qtyInput = root.querySelector(`[data-role="plan-item-qty-${planId}"]`);
+        const unitInput = root.querySelector(`[data-role="plan-item-unit-${planId}"]`);
+        const priceInput = root.querySelector(`[data-role="plan-item-price-${planId}"]`);
+        const name = nameInput.value.trim();
+        const qty = Number(qtyInput.value) || 1;
+        const price = parseMoneyString(priceInput.value);
+        if (!name) { nameInput.focus(); return; }
+        if (!price || price <= 0) { priceInput.focus(); return; }
+        const plan = state.budgetPlans.find(p => p.id === planId);
+        plan.items.push({
+          id: uid(),
+          section: sectionInput ? sectionInput.value.trim() : '',
+          name, qty,
+          unit: unitInput ? unitInput.value.trim() : '',
+          price, done: false, actual: null
+        });
+        render(); await saveState();
+      });
+    });
+
+    root.querySelectorAll('[data-action="toggle-plan-item"]').forEach(el => {
+      el.addEventListener('change', async (e) => {
+        const planId = e.currentTarget.getAttribute('data-plan');
+        const itemId = e.currentTarget.getAttribute('data-item');
+        const plan = state.budgetPlans.find(p => p.id === planId);
+        const item = plan.items.find(i => i.id === itemId);
+        item.done = e.currentTarget.checked;
+        render(); await saveState();
+      });
+    });
+
+    root.querySelectorAll('[data-action="set-plan-actual"]').forEach(el => {
+      el.addEventListener('change', async (e) => {
+        const planId = e.currentTarget.getAttribute('data-plan');
+        const itemId = e.currentTarget.getAttribute('data-item');
+        const plan = state.budgetPlans.find(p => p.id === planId);
+        const item = plan.items.find(i => i.id === itemId);
+        item.actual = parseMoneyString(e.currentTarget.value);
+        render(); await saveState();
+      });
+    });
+
+    root.querySelectorAll('[data-action="del-plan-item"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const planId = e.currentTarget.getAttribute('data-plan');
+        const itemId = e.currentTarget.getAttribute('data-item');
+        const plan = state.budgetPlans.find(p => p.id === planId);
+        plan.items = plan.items.filter(i => i.id !== itemId);
+        render(); await saveState();
+      });
+    });
+
+    root.querySelectorAll('[data-action="record-plan-total"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const planId = e.currentTarget.getAttribute('data-plan');
+        const plan = state.budgetPlans.find(p => p.id === planId);
+        const catSelect = root.querySelector(`[data-role="plan-target-cat-${planId}"]`);
+        const targetCat = catSelect ? catSelect.value : 'tambahan';
+        const { realisasi } = planTotals(plan);
+        if (realisasi <= 0) return;
+        state[targetCat].transactions.push({ id: uid(), note: 'Rencana: ' + plan.name, amount: realisasi, date: todayStr() });
+        render(); await saveState();
+      });
+    });
+
+    root.querySelectorAll('[data-action="print-plan-rab"]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        const planId = e.currentTarget.getAttribute('data-plan');
+        const plan = state.budgetPlans.find(p => p.id === planId);
+        if (!plan) return;
+        if (plan.items.length === 0) {
+          uiState.confirmModal = { message: 'Rencana ini belum punya item. Tambahkan item dulu sebelum mencetak PDF.', confirmLabel: 'Oke', safe: true, onConfirm: async () => {} };
+          render();
+          return;
+        }
+        const printArea = document.getElementById('rab-print-area');
+        printArea.innerHTML = buildRABHtml(plan);
+        window.print();
+      });
+    });
+  }
+
+  function collectLaporanData() {
+    const dTarget = daruratTarget();
+    const dSaldo = daruratSaldo();
+    const dReached = daruratReached();
+    const pokokSp = pokokSpent(), pokokTg = pokokTarget();
+    const tambahanSp = tambahanSpent(), tambahanTg = tambahanTarget();
+    const utangSp = state.utang.enabled ? utangSpent() : 0, utangTg = state.utang.enabled ? utangTarget() : 0;
+    const totalPengeluaran = pokokSp + tambahanSp + utangSp;
+    const income = totalIncome();
+    const cashflow = income - totalPengeluaran;
+    const kekayaan = dSaldo + tabunganSaldo() + investasiSaldo();
+
+    const rincianPemasukan = [{ name: 'Pemasukan Utama', amount: state.income }]
+      .concat((state.incomeExtra || []).map(x => ({ name: x.name, amount: x.amount })));
+
+    const rincianPengeluaran = [];
+    state.pokok.transactions.filter(t => isThisMonth(t.date)).forEach(t => rincianPengeluaran.push({ date: t.date, kategori: 'Kebutuhan Pokok', note: t.note, amount: t.amount }));
+    state.tambahan.transactions.filter(t => isThisMonth(t.date)).forEach(t => rincianPengeluaran.push({ date: t.date, kategori: 'Kebutuhan Tambahan', note: t.note, amount: t.amount }));
+    if (state.utang.enabled) state.utang.transactions.filter(t => isThisMonth(t.date)).forEach(t => rincianPengeluaran.push({ date: t.date, kategori: 'Cicilan/Utang', note: t.note, amount: t.amount }));
+    rincianPengeluaran.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const tabunganRows = [{ name: 'Dana Darurat', target: dTarget, terkumpul: dSaldo }]
+      .concat(state.tabungan.goals.map(g => ({ name: g.name, target: g.target, terkumpul: g.transactions.reduce((s, t) => s + t.amount, 0) })));
+
+    const allocRows = [
+      { name: 'Kebutuhan Pokok', pct: state.pokok.pct, target: pokokTg, realisasi: pokokSp },
+      { name: 'Dana Darurat', pct: state.darurat.pct, target: dTarget, realisasi: dSaldo },
+      { name: 'Tabungan Tujuan', pct: state.tabungan.pct, target: tabunganRows.slice(1).reduce((s, g) => s + g.target, 0), realisasi: tabunganSaldo() },
+      { name: 'Investasi', pct: investasiEffectivePct(), target: null, realisasi: investasiSaldo() },
+      { name: 'Kebutuhan Tambahan', pct: state.tambahan.pct, target: tambahanTg, realisasi: tambahanSp },
+    ];
+    if (state.utang.enabled) allocRows.push({ name: 'Cicilan / Utang', pct: state.utang.pct, target: utangTg, realisasi: utangSp });
+
+    return {
+      income, totalPengeluaran, cashflow, kekayaan,
+      rincianPemasukan, rincianPengeluaran, tabunganRows, allocRows,
+      periodLabel: MONTHS_FULL[new Date().getMonth()] + ' ' + new Date().getFullYear()
+    };
+  }
+
+  function renderLaporanView() {
+    const d = collectLaporanData();
+    const segs = computeAllocationSegments();
+
+    const tujuanHtml = d.tabunganRows.map(g => {
+      const pct = g.target > 0 ? Math.min(100, (g.terkumpul / g.target) * 100) : 0;
+      return `
+        <div class="lap-goal">
+          <div class="lap-goal-name">${escapeHtml(g.name)}</div>
+          <div class="lap-goal-amt num">${formatRupiah(g.terkumpul)} <span style="color:var(--ink-soft);font-weight:400;">/ ${formatRupiah(g.target)}</span></div>
+          <div class="env-bar-track"><div class="env-bar-fill" style="width:${pct}%; background:var(--sage);"></div></div>
+        </div>
+      `;
+    }).join('');
+
+    const pemasukanRows = d.rincianPemasukan.map(r => `<tr><td>${escapeHtml(r.name)}</td><td class="rab-r num">${formatRupiah(r.amount)}</td></tr>`).join('');
+    const pengeluaranRows = d.rincianPengeluaran.length === 0 ? '<tr><td colspan="4" class="empty-stat" style="text-align:center;">Belum ada catatan bulan ini</td></tr>' : d.rincianPengeluaran.map(r => `
+      <tr><td class="num">${formatDateShort(r.date)}</td><td>${escapeHtml(r.kategori)}</td><td>${escapeHtml(r.note || '-')}</td><td class="rab-r num">${formatRupiah(r.amount)}</td></tr>
+    `).join('');
+
+    const allocRows = d.allocRows.map(a => {
+      const pct = a.target > 0 ? Math.min(100, (a.realisasi / a.target) * 100) : 0;
+      return `
+        <div class="lap-alloc-card">
+          <div class="lap-alloc-pct num">${a.pct}%</div>
+          <div class="lap-alloc-name">${escapeHtml(a.name)}</div>
+          <div class="lap-alloc-amt num">${formatRupiah(a.realisasi)}${a.target > 0 ? ' / ' + formatRupiah(a.target) : ''}</div>
+          ${a.target > 0 ? `<div class="env-bar-track"><div class="env-bar-fill" style="width:${pct}%; background:var(--gold);"></div></div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="lap-header">
+        <div>
+          <h2 class="lap-title">LAPORAN KEUANGAN</h2>
+          <p class="lap-subtitle">"Bukan tentang berapa banyak yang kamu hasilkan, tapi bagaimana kamu mengelolanya dengan bijak."</p>
+        </div>
+        <div class="lap-period">${d.periodLabel}<span>Diperbarui otomatis dari data terkini</span></div>
+      </div>
+
+      <div class="lap-summary-grid">
+        <div class="summary-card"><div class="label">Total Pemasukan</div><div class="value ok num">${formatRupiah(d.income)}</div></div>
+        <div class="summary-card"><div class="label">Total Pengeluaran</div><div class="value warn num">${formatRupiah(d.totalPengeluaran)}</div></div>
+        <div class="summary-card"><div class="label">Cashflow Bulan Ini</div><div class="value ${d.cashflow >= 0 ? 'ok' : 'warn'} num">${formatRupiah(d.cashflow)}</div></div>
+        <div class="summary-card"><div class="label">Kekayaan Terkumpul</div><div class="value num">${formatRupiah(d.kekayaan)}</div></div>
+      </div>
+
+      <div class="lap-grid-3">
+        <div class="stat-section">
+          <h3>Tujuan Keuangan</h3>
+          ${tujuanHtml}
+        </div>
+        <div class="stat-section">
+          <h3>Tren Pengeluaran Bulanan</h3>
+          ${renderMonthlyTrendChart()}
+        </div>
+        <div class="stat-section">
+          <h3>Alokasi Pengeluaran</h3>
+          ${renderDonutSVG(segs.filter(s => s.pct > 0).map(s => ({ value: s.pct, color: s.color })), 150)}
+          <div class="alloc-legend" style="margin-top:10px;">${segs.map(s => `<div class="alloc-legend-item"><span class="alloc-legend-dot" style="background:${s.color}"></span>${s.name}: ${s.pct}%</div>`).join('')}</div>
+        </div>
+      </div>
+
+      <div class="lap-grid-2">
+        <div class="stat-section">
+          <h3>Rincian Pemasukan</h3>
+          <table class="stat-table"><tbody>${pemasukanRows}
+            <tr style="font-weight:700;background:#F3EEDD;"><td>TOTAL PEMASUKAN</td><td class="rab-r num">${formatRupiah(d.income)}</td></tr>
+          </tbody></table>
+        </div>
+        <div class="stat-section">
+          <h3>Rincian Pengeluaran (Bulan Ini)</h3>
+          <div class="table-scroll"><table class="stat-table"><thead><tr><th>Tanggal</th><th>Kategori</th><th>Catatan</th><th>Jumlah</th></tr></thead><tbody>${pengeluaranRows}
+            <tr style="font-weight:700;background:#F3EEDD;"><td colspan="3">TOTAL PENGELUARAN</td><td class="rab-r num">${formatRupiah(d.totalPengeluaran)}</td></tr>
+          </tbody></table></div>
+        </div>
+      </div>
+
+      <div class="stat-section">
+        <h3>Alokasi Budget</h3>
+        <div class="lap-alloc-grid">${allocRows}</div>
+      </div>
+
+      <div class="stat-section">
+        <h3>Catatan</h3>
+        <textarea id="laporan-notes" class="lap-notes" placeholder="Tulis catatan atau refleksi keuanganmu bulan ini...">${escapeHtml(state.notes || '')}</textarea>
+      </div>
+
+      <div class="lap-actions">
+        <button class="close-month-btn" data-action="download-laporan">⬇ Unduh Laporan (PDF)</button>
+      </div>
+      <p class="footer-note">Laporan ini mencerminkan kondisi terkini (bulan berjalan). Untuk riwayat bulan-bulan sebelumnya, lihat halaman Tabel.</p>
+    `;
+  }
+
+  function buildLaporanPrintHtml() {
+    const d = collectLaporanData();
+    const segs = computeAllocationSegments();
+    const tujuanRows = d.tabunganRows.map(g => `<tr><td>${escapeHtml(g.name)}</td><td class="rab-r num">${formatRupiah(g.terkumpul)}</td><td class="rab-r num">${formatRupiah(g.target)}</td><td class="rab-c num">${g.target > 0 ? Math.round(Math.min(100, g.terkumpul / g.target * 100)) : 0}%</td></tr>`).join('');
+    const pemasukanRows = d.rincianPemasukan.map(r => `<tr><td>${escapeHtml(r.name)}</td><td class="rab-r num">${formatRupiah(r.amount)}</td></tr>`).join('');
+    const pengeluaranRows = d.rincianPengeluaran.length === 0 ? '<tr><td colspan="4" style="text-align:center;">Belum ada catatan bulan ini</td></tr>' : d.rincianPengeluaran.map(r => `<tr><td class="num">${formatDateShort(r.date)}</td><td>${escapeHtml(r.kategori)}</td><td>${escapeHtml(r.note || '-')}</td><td class="rab-r num">${formatRupiah(r.amount)}</td></tr>`).join('');
+    const allocRows = d.allocRows.map(a => `<tr><td>${escapeHtml(a.name)}</td><td class="rab-c num">${a.pct}%</td><td class="rab-r num">${formatRupiah(a.realisasi)}</td><td class="rab-r num">${a.target > 0 ? formatRupiah(a.target) : '-'}</td></tr>`).join('');
+
+    return `
+      <div class="rab-doc">
+        <h1 class="rab-title">LAPORAN KEUANGAN</h1>
+        <p class="rab-subtitle">${d.periodLabel}</p>
+        <table class="rab-info">
+          <tr><td>Total Pemasukan</td><td>:</td><td class="num">${formatRupiah(d.income)}</td></tr>
+          <tr><td>Total Pengeluaran</td><td>:</td><td class="num">${formatRupiah(d.totalPengeluaran)}</td></tr>
+          <tr><td>Cashflow Bulan Ini</td><td>:</td><td class="num">${formatRupiah(d.cashflow)}</td></tr>
+          <tr><td>Kekayaan Terkumpul</td><td>:</td><td class="num">${formatRupiah(d.kekayaan)}</td></tr>
+        </table>
+
+        <h3 style="color:#1B4332;font-size:13px;margin:14px 0 6px;">Tren Pengeluaran Bulanan</h3>
+        ${renderMonthlyTrendChart()}
+
+        <h3 style="color:#1B4332;font-size:13px;margin:14px 0 6px;">Rincian Pemasukan</h3>
+        <table class="rab-table"><thead><tr><th>Sumber</th><th>Jumlah</th></tr></thead><tbody>${pemasukanRows}
+          <tr class="rab-grand-row"><td><b>TOTAL</b></td><td class="rab-r"><b>Rp ${formatRABNumber(d.income)}</b></td></tr>
+        </tbody></table>
+
+        <h3 style="color:#1B4332;font-size:13px;margin:14px 0 6px;">Rincian Pengeluaran</h3>
+        <table class="rab-table"><thead><tr><th>Tanggal</th><th>Kategori</th><th>Catatan</th><th>Jumlah</th></tr></thead><tbody>${pengeluaranRows}
+          <tr class="rab-grand-row"><td colspan="3"><b>TOTAL</b></td><td class="rab-r"><b>Rp ${formatRABNumber(d.totalPengeluaran)}</b></td></tr>
+        </tbody></table>
+
+        <h3 style="color:#1B4332;font-size:13px;margin:14px 0 6px;">Alokasi Budget</h3>
+        <table class="rab-table"><thead><tr><th>Kantong</th><th>%</th><th>Realisasi</th><th>Target</th></tr></thead><tbody>${allocRows}</tbody></table>
+
+        <h3 style="color:#1B4332;font-size:13px;margin:14px 0 6px;">Tujuan Keuangan</h3>
+        <table class="rab-table"><thead><tr><th>Nama</th><th>Terkumpul</th><th>Target</th><th>Progress</th></tr></thead><tbody>${tujuanRows}</tbody></table>
+
+        ${state.notes ? `<h3 style="color:#1B4332;font-size:13px;margin:14px 0 6px;">Catatan</h3><p style="font-size:11px;white-space:pre-wrap;">${escapeHtml(state.notes)}</p>` : ''}
+      </div>
+    `;
+  }
+
+  function attachLaporanEvents() {
+    const notesArea = document.getElementById('laporan-notes');
+    if (notesArea) notesArea.addEventListener('change', async (e) => {
+      state.notes = e.target.value;
+      await saveState();
+    });
+    const downloadBtn = root.querySelector('[data-action="download-laporan"]');
+    if (downloadBtn) downloadBtn.addEventListener('click', () => {
+      const printArea = document.getElementById('rab-print-area');
+      printArea.innerHTML = buildLaporanPrintHtml();
+      window.print();
+    });
+  }
+
+  function renderPanduanView() {
+    return `
+      <div class="stat-section">
+        <h3>Konsep Dasar: Bayar Dirimu Sendiri Dulu</h3>
+        <p class="stat-desc" style="margin-bottom:10px;">Urutan kantong di halaman utama sengaja disusun: <b>Kebutuhan Pokok → Dana Darurat → Tabungan Tujuan → Investasi → Kebutuhan Tambahan</b>. Yang pertama disisihkan adalah yang penting untuk bertahan hidup dan masa depan; yang paling akhir adalah yang paling mudah membengkak tanpa sadar (hiburan, gaya hidup).</p>
+        <p class="stat-desc">Semua rumus di aplikasi ini adalah sintesis dari prinsip umum personal finance (pay yourself first, mental accounting, emergency fund theory, dsb) — bukan nasihat resmi dari lembaga tertentu. Sesuaikan persentase dan target dengan kondisi nyatamu.</p>
+      </div>
+
+      <div class="stat-section">
+        <h3>Penjelasan Tiap Kantong</h3>
+        <div class="compare-row"><div class="compare-label"><span class="name">Kebutuhan Pokok</span></div><p class="stat-desc">Makan, sewa, listrik, transport — biaya yang kalau tidak dibayar akan jadi masalah. Gunakan Kalkulator Estimasi untuk merinci biaya harian (mis. makan Rp50rb × 30 hari).</p></div>
+        <div class="compare-row"><div class="compare-label"><span class="name">Dana Darurat</span></div><p class="stat-desc">Bukan jatah bulanan yang habis, tapi saldo yang terus terkumpul sampai target (default 6× Kebutuhan Pokok bulanan). Setelah target tercapai, alokasi persennya otomatis dianggap pindah ke Investasi.</p></div>
+        <div class="compare-row"><div class="compare-label"><span class="name">Tabungan Tujuan</span></div><p class="stat-desc">Bisa punya beberapa tujuan sekaligus (DP rumah, pendidikan, dll), masing-masing dengan target dan progres sendiri.</p></div>
+        <div class="compare-row"><div class="compare-label"><span class="name">Investasi</span></div><p class="stat-desc">Setiap setoran bisa ditandai jenis instrumennya untuk memantau diversifikasi (jangan taruh semua di satu jenis aset).</p></div>
+        <div class="compare-row"><div class="compare-label"><span class="name">Kebutuhan Tambahan</span></div><p class="stat-desc">Hiburan, jajan, gaya hidup — sengaja diletakkan terakhir supaya tidak mengorbankan tabungan/investasi.</p></div>
+        <div class="compare-row"><div class="compare-label"><span class="name">Cicilan/Utang (opsional)</span></div><p class="stat-desc">Aktifkan lewat tombol "+ Tambah Pos" di halaman Kantong. Disarankan tidak lebih dari 30% dari pendapatan, dan lunasi utang berbunga tinggi lebih dulu.</p></div>
+        <div class="compare-row"><div class="compare-label"><span class="name">Rencana Anggaran</span></div><p class="stat-desc">Halaman terpisah untuk rencana biaya acara tertentu (camping, masak untuk tamu, dll) — rincikan item, centang yang sudah dibeli, lalu opsional catat totalnya sebagai pengeluaran di kantong bulanan.</p></div>
+      </div>
+
+      <div class="stat-section">
+        <h3>Rumus Rasio Kesehatan Keuangan (di halaman Statistik)</h3>
+        <div class="compare-row"><div class="compare-label"><span class="name">Rasio Dana Darurat</span></div><p class="stat-desc num" style="font-style:normal;">Aset Likuid ÷ Pengeluaran Bulanan = berapa bulan kamu bisa bertahan tanpa penghasilan. Ideal ≥ 6 bulan.</p></div>
+        <div class="compare-row"><div class="compare-label"><span class="name">DSR (Debt Service Ratio)</span></div><p class="stat-desc num" style="font-style:normal;">Cicilan Utang Bulanan ÷ Pendapatan × 100%. Sehat ≤ 30%, waspada 30–35%, tidak sehat di atas itu.</p></div>
+        <div class="compare-row"><div class="compare-label"><span class="name">Rasio Tabungan</span></div><p class="stat-desc num" style="font-style:normal;">(Tabungan + Investasi Bulanan) ÷ Pendapatan × 100%. Ideal minimal 10–20%.</p></div>
+      </div>
+
+      <div class="stat-section">
+        <h3>Cara Pakai Sehari-hari</h3>
+        <p class="stat-desc">1. Catat pengeluaran begitu terjadi — bisa lewat kartu masing-masing di halaman Kantong, atau lebih cepat lewat halaman <b>Harian</b> (ada kalender & form cepat).<br>
+        2. Pantau progres di halaman <b>Statistik</b> — cek rasio kesehatan keuangan dan kecepatan pengeluaranmu bulan ini.<br>
+        3. Di akhir bulan, klik <b>"Tutup Bulan Ini"</b> di halaman Kantong. Ini akan menyimpan ringkasan bulan tersebut ke arsip (bisa dilihat di halaman <b>Tabel</b>) dan mengosongkan catatan Kebutuhan Pokok/Tambahan/Cicilan untuk bulan baru. Saldo Dana Darurat, Tabungan, dan Investasi tidak pernah hilang.<br>
+        4. Sesekali unduh CSV di halaman Tabel sebagai cadangan data, terutama menjelang pergantian tahun.</p>
+      </div>
+
+      <div class="stat-section">
+        <h3>Tentang Penyimpanan Data</h3>
+        <p class="stat-desc">Data tersimpan otomatis setiap kali kamu mengubah sesuatu, dan akan tetap ada setiap kali kamu membuka artifact ini lagi — termasuk untuk penggunaan bertahun-tahun, selama kamu tidak menekan tombol "Reset Semua Data". Karena ini bukan aplikasi cloud terpisah, sebaiknya unduh CSV secara berkala (di halaman Tabel) sebagai cadangan, terutama sebelum mengganti perangkat atau akun.</p>
+      </div>
+    `;
+  }
+
+  function renderStairs() {
+    const container = document.getElementById('stairs-container');
+    let html = '';
+    html += renderFlowCard(1, '#1B4332', 'pokok', 'Kebutuhan Pokok', 'Makan, sewa, listrik, transport', pokokTarget(), pokokSpent());
+    html += renderDaruratCard(2, '#A8443E');
+    html += renderTabunganCard(3, '#4C7A5B');
+    html += renderInvestasiCard(4, '#5B4E8A');
+    html += renderFlowCard(5, '#B8862E', 'tambahan', 'Kebutuhan Tambahan', 'Hiburan, gaya hidup, jajan', tambahanTarget(), tambahanSpent());
+    html += renderUtangCard();
+    container.innerHTML = html;
+    attachCardEvents();
+  }
+
+  function renderFlowCard(step, color, key, name, desc, target, spent) {
+    const cat = state[key];
+    const pctUsed = target > 0 ? Math.min(100, (spent / target) * 100) : (spent > 0 ? 100 : 0);
+    const over = spent > target && target > 0;
+    const barColor = over ? 'var(--brick)' : color;
+    const txHtml = cat.transactions.length === 0
+      ? '<li class="tx-empty">Belum ada catatan</li>'
+      : cat.transactions.slice().reverse().map(t => `
+          <li><span class="tx-date-badge num">${formatDateShort(t.date)}</span><span class="note">${escapeHtml(t.note || '(tanpa catatan)')}</span>
+          <span class="amt">${formatRupiah(t.amount)}</span>
+          <button data-action="del-tx" data-cat="${key}" data-id="${t.id}" title="Hapus">✕</button></li>
+        `).join('');
+    return `
+      <div class="envelope">
+        <div class="step-badge" style="--step-color:${color}">${step}</div>
+        <div class="envelope-body">
+          <div class="envelope-head">
+            <div><p class="envelope-name">${name}</p><p class="envelope-desc">${desc}</p></div>
+            <span class="pct-editable"><input class="pct-input num" type="number" min="0" max="100" data-action="set-pct" data-cat="${key}" value="${cat.pct}">% / bulan<span class="pct-nominal num">≈ ${pctNominal(cat.pct)}</span></span>
+          </div>
+          <div class="env-bar-track"><div class="env-bar-fill" style="width:${pctUsed}%; background:${barColor}"></div></div>
+          <div class="env-numbers">
+            <span class="spent num" style="${over ? 'color:var(--brick)' : ''}">${formatRupiah(spent)} terpakai</span>
+            <span class="target num">dari ${formatRupiah(target)}</span>
+          </div>
+          <p class="sisa-line ${over ? 'over' : ''}">${over ? 'Lewat anggaran ' + formatRupiah(spent - target) : 'Sisa ' + formatRupiah(Math.max(0, target - spent))}</p>
+          <ul class="tx-list">${txHtml}</ul>
+          <div class="add-tx">
+            <input class="tx-date" type="date" data-role="txdate-${key}" value="${todayStr()}">
+            <input class="note" type="text" placeholder="Catatan pengeluaran" data-role="note-${key}">
+            <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Jumlah" data-role="amount-${key}">
+            <button data-action="add-tx" data-cat="${key}">+</button>
+          </div>
+          ${renderCalcSection(key)}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCalcSection(key) {
+    const isOpen = !!uiState.calcOpen[key];
+    const rows = state[key].calc || [];
+    const total = rows.reduce((s, r) => s + (r.perUnit * r.qty), 0);
+    const suggestedPct = totalIncome() > 0 ? Math.round((total / totalIncome()) * 100) : 0;
+    let inner = '';
+    if (isOpen) {
+      const rowsHtml = rows.length === 0 ? '<li class="desc" style="font-style:italic;">Belum ada rincian</li>' : rows.map(r => `
+        <li>
+          <span class="desc">${escapeHtml(r.name)} — ${formatRupiah(r.perUnit)} × ${r.qty}</span>
+          <span class="subtotal num">${formatRupiah(r.perUnit * r.qty)}</span>
+          <button class="record-btn" data-action="add-calc-to-tx" data-cat="${key}" data-id="${r.id}" title="Catat sebagai pengeluaran">→</button>
+          <button data-action="del-calc-row" data-cat="${key}" data-id="${r.id}" title="Hapus">✕</button>
+        </li>
+      `).join('');
+      inner = `
+        <div class="calc-panel">
+          <p class="calc-hint">Rincikan kebutuhan per item, misal "Makan" dengan harga per hari Rp50.000 selama 30 hari.</p>
+          <ul class="calc-rows">${rowsHtml}</ul>
+          <div class="calc-add">
+            <input class="calc-name" type="text" placeholder="Nama (mis. Makan)" data-role="calc-name-${key}">
+            <input class="calc-perunit num money-input" type="text" inputmode="numeric" placeholder="Rp per hari/satuan" data-role="calc-perunit-${key}">
+            <input class="calc-qty num" type="number" placeholder="Jumlah hari" data-role="calc-qty-${key}">
+            <button data-action="add-calc-row" data-cat="${key}">+</button>
+          </div>
+          <div class="calc-total-row"><span>Total estimasi</span><span class="num">${formatRupiah(total)}${totalIncome() > 0 ? ' (' + suggestedPct + '% dari pemasukan)' : ''}</span></div>
+          ${rows.length > 0 ? `<button class="calc-record-all-btn" data-action="add-all-calc-to-tx" data-cat="${key}">→ Catat Semua ke Pengeluaran (${rows.length} item)</button>` : ''}
+          <button class="calc-use-btn" data-action="use-calc" data-cat="${key}" ${totalIncome() <= 0 ? 'disabled' : ''}>Gunakan sebagai target bulanan</button>
+        </div>
+      `;
+    }
+    return `<button class="calc-toggle" data-action="toggle-calc" data-cat="${key}">🧮 Kalkulator Estimasi ${isOpen ? '▲' : '▼'}</button>${inner}`;
+  }
+
+  function renderDaruratCard(step, color) {
+    const cat = state.darurat;
+    const target = daruratTarget();
+    const saldo = daruratSaldo();
+    const reached = daruratReached();
+    const pctUsed = target > 0 ? Math.min(100, (saldo / target) * 100) : 0;
+    const txHtml = cat.transactions.length === 0
+      ? '<li class="tx-empty">Belum ada setoran</li>'
+      : cat.transactions.slice().reverse().map(t => `
+          <li><span class="tx-date-badge num">${formatDateShort(t.date)}</span><span class="note">${escapeHtml(t.note || (t.type === 'out' ? 'Penggunaan darurat' : 'Setoran'))}</span>
+          <span class="amt ${t.type === 'out' ? 'out' : ''} num">${t.type === 'out' ? '−' : '+'}${formatRupiah(t.amount)}</span>
+          <button data-action="del-tx-darurat" data-id="${t.id}" title="Hapus">✕</button></li>
+        `).join('');
+    return `
+      <div class="envelope">
+        <div class="step-badge" style="--step-color:${color}">${step}</div>
+        <div class="envelope-body">
+          <div class="envelope-head">
+            <div><p class="envelope-name">Dana Darurat</p><p class="envelope-desc">Target: <input class="pct-input num" type="number" min="1" max="24" data-action="set-darurat-months" value="${cat.targetMonths}" style="width:32px"> bulan biaya pokok</p></div>
+            <span class="pct-editable"><input class="pct-input num" type="number" min="0" max="100" data-action="set-darurat-pct" value="${cat.pct}">% / bulan<span class="pct-nominal num">≈ ${pctNominal(cat.pct)}</span></span>
+          </div>
+          ${reached ? `<div class="achieved-banner">✓ Target tercapai! Alokasi ${cat.pct}% otomatis dialihkan ke Investasi.</div>` : ''}
+          <p class="darurat-formula">Rumus: ${formatRupiah(pokokTarget())} (Kebutuhan Pokok/bulan) × ${cat.targetMonths} bulan = ${formatRupiah(target)}</p>
+          <div class="env-bar-track"><div class="env-bar-fill" style="width:${pctUsed}%; background:${reached ? 'var(--sage)' : color}"></div></div>
+          <div class="env-numbers">
+            <span class="spent num">${formatRupiah(saldo)} terkumpul</span>
+            <span class="target num">dari target ${formatRupiah(target)}</span>
+          </div>
+          <p class="sisa-line ${reached ? 'ok' : ''}">${reached ? '✓ Target tercapai' : 'Sisa menuju target ' + formatRupiah(Math.max(0, target - saldo))}</p>
+          <ul class="tx-list">${txHtml}</ul>
+          <div class="add-tx">
+            <input class="tx-date" type="date" data-role="txdate-darurat" value="${todayStr()}">
+            <select data-role="type-darurat">
+              <option value="in">Setoran</option>
+              <option value="out">Pakai untuk darurat</option>
+            </select>
+            <input class="note" type="text" placeholder="Catatan" data-role="note-darurat">
+            <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Jumlah" data-role="amount-darurat">
+            <button data-action="add-tx-darurat">+</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTabunganCard(step, color) {
+    const cat = state.tabungan;
+    const goalsHtml = cat.goals.map(g => {
+      const saldo = g.transactions.reduce((s, t) => s + t.amount, 0);
+      const pctUsed = g.target > 0 ? Math.min(100, (saldo / g.target) * 100) : 0;
+      const goalReached = g.target > 0 && saldo >= g.target;
+      return `
+        <div class="goal-row">
+          <div class="goal-row-head">
+            <span class="name">${escapeHtml(g.name)}</span>
+            <button data-action="del-goal" data-goal="${g.id}" title="Hapus tujuan">✕</button>
+          </div>
+          <div class="env-bar-track"><div class="env-bar-fill" style="width:${pctUsed}%; background:${goalReached ? 'var(--sage)' : color}"></div></div>
+          <div class="env-numbers">
+            <span class="spent num">${formatRupiah(saldo)}</span>
+            <span class="target num">dari <input class="pct-input num money-input" type="text" inputmode="numeric" data-action="set-goal-target" data-goal="${g.id}" value="${formatMoneyString(g.target)}" style="width:80px;text-align:right;"></span>
+          </div>
+          <p class="sisa-line ${goalReached ? 'ok' : ''}">${goalReached ? '✓ Target tercapai' : 'Sisa ' + formatRupiah(Math.max(0, g.target - saldo))}</p>
+          <div class="add-tx">
+            <input class="tx-date" type="date" data-role="goal-date-${g.id}" value="${todayStr()}">
+            <input class="note" type="text" placeholder="Catatan" data-role="goal-note-${g.id}">
+            <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Jumlah" data-role="goal-amount-${g.id}">
+            <button data-action="add-goal-tx" data-goal="${g.id}">+</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="envelope">
+        <div class="step-badge" style="--step-color:${color}">${step}</div>
+        <div class="envelope-body">
+          <div class="envelope-head">
+            <div><p class="envelope-name">Tabungan Tujuan</p><p class="envelope-desc">Simpanan dengan target dan nama tujuan masing-masing</p></div>
+            <span class="pct-editable"><input class="pct-input num" type="number" min="0" max="100" data-action="set-pct" data-cat="tabungan" value="${cat.pct}">% / bulan<span class="pct-nominal num">≈ ${pctNominal(cat.pct)}</span></span>
+          </div>
+          ${goalsHtml || '<p class="tx-empty">Belum ada tujuan tabungan</p>'}
+          <button class="add-goal-btn" data-action="toggle-add-goal">${uiState.addGoalOpen ? '✕ Batal' : '+ Tambah Tujuan Baru'}</button>
+          ${uiState.addGoalOpen ? `
+            <div class="calc-panel" style="margin-top:8px;">
+              <div class="add-tx">
+                <input class="note" type="text" placeholder="Nama tujuan (mis. DP Rumah)" data-role="new-goal-name">
+                <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Target Rp" data-role="new-goal-target">
+                <button data-action="confirm-add-goal">Tambah</button>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderInvestasiCard(step, color) {
+    const cat = state.investasi;
+    const saldo = investasiSaldo();
+    const effPct = investasiEffectivePct();
+    const byInstrument = {};
+    cat.transactions.forEach(t => { byInstrument[t.instrument || 'Lainnya'] = (byInstrument[t.instrument || 'Lainnya'] || 0) + t.amount; });
+    const chipsHtml = Object.keys(byInstrument).length === 0 ? '' :
+      '<div class="instrument-chips">' + Object.entries(byInstrument).map(([k, v]) => `<span class="chip">${escapeHtml(k)}: ${formatRupiah(v)}</span>`).join('') + '</div>';
+    const txHtml = cat.transactions.length === 0
+      ? '<li class="tx-empty">Belum ada investasi tercatat</li>'
+      : cat.transactions.slice().reverse().map(t => `
+          <li><span class="tx-date-badge num">${formatDateShort(t.date)}</span><span class="note">${escapeHtml(t.note || t.instrument || 'Investasi')}</span>
+          <span class="amt num">${formatRupiah(t.amount)}</span>
+          <button data-action="del-tx-investasi" data-id="${t.id}" title="Hapus">✕</button></li>
+        `).join('');
+    return `
+      <div class="envelope">
+        <div class="step-badge" style="--step-color:${color}">${step}</div>
+        <div class="envelope-body">
+          <div class="envelope-head">
+            <div><p class="envelope-name">Investasi</p><p class="envelope-desc">Reksadana, saham, obligasi, emas — sebar sesuai profil risiko</p></div>
+            <span class="pct-editable"><input class="pct-input num" type="number" min="0" max="100" data-action="set-pct" data-cat="investasi" value="${cat.pct}">% / bulan${effPct !== Number(cat.pct) ? ` <b class="num" style="color:var(--sage)">(efektif ${effPct}%)</b>` : ''}<span class="pct-nominal num">≈ ${pctNominal(cat.pct)}</span></span>
+          </div>
+          <div class="env-numbers"><span class="spent num" style="color:var(--ink)">${formatRupiah(saldo)} terkumpul</span></div>
+          ${chipsHtml}
+          <ul class="tx-list">${txHtml}</ul>
+          <div class="add-tx">
+            <input class="tx-date" type="date" data-role="txdate-investasi" value="${todayStr()}">
+            <select data-role="instrument-investasi">
+              ${INSTRUMENTS.map(i => `<option value="${i}">${i}</option>`).join('')}
+            </select>
+            <input class="note" type="text" placeholder="Catatan (opsional)" data-role="note-investasi">
+            <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Jumlah" data-role="amount-investasi">
+            <button data-action="add-tx-investasi">+</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderUtangCard() {
+    if (!state.utang.enabled) {
+      return `<button class="add-pocket-btn" data-action="enable-utang">+ Tambah Pos Cicilan / Utang (opsional)</button>`;
+    }
+    const target = utangTarget();
+    const spent = utangSpent();
+    const pctUsed = target > 0 ? Math.min(100, (spent / target) * 100) : (spent > 0 ? 100 : 0);
+    const over = spent > target && target > 0;
+    const overBudget = totalIncome() > 0 && (Number(state.utang.pct) || 0) > 30;
+    const txHtml = state.utang.transactions.length === 0
+      ? '<li class="tx-empty">Belum ada catatan</li>'
+      : state.utang.transactions.slice().reverse().map(t => `
+          <li><span class="tx-date-badge num">${formatDateShort(t.date)}</span><span class="note">${escapeHtml(t.note || '(tanpa catatan)')}</span>
+          <span class="amt">${formatRupiah(t.amount)}</span>
+          <button data-action="del-tx" data-cat="utang" data-id="${t.id}" title="Hapus">✕</button></li>
+        `).join('');
+    return `
+      <div class="envelope">
+        <div class="step-badge" style="--step-color:#7A6C5D">$</div>
+        <div class="envelope-body">
+          <div class="envelope-head">
+            <div><p class="envelope-name">Cicilan / Utang</p><p class="envelope-desc">KPR, kendaraan, kartu kredit, dll</p></div>
+            <span class="pct-editable"><input class="pct-input num" type="number" min="0" max="100" data-action="set-pct" data-cat="utang" value="${state.utang.pct}">% / bulan<span class="pct-nominal num">≈ ${pctNominal(state.utang.pct)}</span></span>
+          </div>
+          ${overBudget ? '<div class="achieved-banner" style="background:#F6E7E6;border-color:var(--brick);color:#7A2E29;">⚠ Total cicilan disarankan tidak lebih dari 30% penghasilan.</div>' : ''}
+          <div class="env-bar-track"><div class="env-bar-fill" style="width:${pctUsed}%; background:${over ? 'var(--brick)' : '#7A6C5D'}"></div></div>
+          <div class="env-numbers">
+            <span class="spent num" style="${over ? 'color:var(--brick)' : ''}">${formatRupiah(spent)} terpakai</span>
+            <span class="target num">dari ${formatRupiah(target)}</span>
+          </div>
+          <p class="sisa-line ${over ? 'over' : ''}">${over ? 'Lewat anggaran ' + formatRupiah(spent - target) : 'Sisa ' + formatRupiah(Math.max(0, target - spent))}</p>
+          <ul class="tx-list">${txHtml}</ul>
+          <div class="add-tx">
+            <input class="tx-date" type="date" data-role="txdate-utang" value="${todayStr()}">
+            <input class="note" type="text" placeholder="Catatan cicilan" data-role="note-utang">
+            <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Jumlah" data-role="amount-utang">
+            <button data-action="add-tx" data-cat="utang">+</button>
+          </div>
+          <p class="utang-note">Lunasi utang berbunga tinggi (kartu kredit, pinjol) lebih dulu sebelum menambah porsi investasi.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  // ---- events ----
+  function attachHeaderEvents() {
+    const incomeInput = document.getElementById('income-input');
+    incomeInput.addEventListener('change', async (e) => {
+      state.income = Math.max(0, parseMoneyString(e.target.value));
+      render(); await saveState();
+    });
+
+    const toggleIncomeBtn = root.querySelector('[data-action="toggle-add-income"]');
+    if (toggleIncomeBtn) toggleIncomeBtn.addEventListener('click', () => {
+      uiState.addIncomeOpen = !uiState.addIncomeOpen;
+      render();
+    });
+    const confirmIncomeBtn = root.querySelector('[data-action="confirm-add-income"]');
+    if (confirmIncomeBtn) confirmIncomeBtn.addEventListener('click', async () => {
+      const nameInput = document.getElementById('new-income-name');
+      const amountInput = document.getElementById('new-income-amount');
+      const name = nameInput.value.trim();
+      const amount = parseMoneyString(amountInput.value);
+      if (!name) { nameInput.focus(); return; }
+      if (!amount || amount <= 0) { amountInput.focus(); return; }
+      state.incomeExtra.push({ id: uid(), name, amount });
+      uiState.addIncomeOpen = false;
+      render(); await saveState();
+    });
+    root.querySelectorAll('[data-action="del-income-extra"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        state.incomeExtra = state.incomeExtra.filter(x => x.id !== id);
+        render(); await saveState();
+      });
+    });
+  }
+
+  function archiveCurrentMonth() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const daruratDeposit = state.darurat.transactions.filter(t => isThisMonth(t.date) && t.type !== 'out').reduce((s, t) => s + t.amount, 0);
+    const daruratWithdraw = state.darurat.transactions.filter(t => isThisMonth(t.date) && t.type === 'out').reduce((s, t) => s + t.amount, 0);
+    const tabunganDeposit = state.tabungan.goals.reduce((s, g) => s + g.transactions.filter(t => isThisMonth(t.date)).reduce((ss, t) => ss + t.amount, 0), 0);
+    const investasiDeposit = state.investasi.transactions.filter(t => isThisMonth(t.date)).reduce((s, t) => s + t.amount, 0);
+    const record = {
+      id: uid(), year, month,
+      income: totalIncome(),
+      pokokSpent: pokokSpent(),
+      tambahanSpent: tambahanSpent(),
+      utangSpent: state.utang.enabled ? utangSpent() : 0,
+      daruratDeposit, daruratWithdraw, tabunganDeposit, investasiDeposit,
+      daruratSaldoEnd: daruratSaldo(), tabunganSaldoEnd: tabunganSaldo(), investasiSaldoEnd: investasiSaldo(),
+      closedAt: now.toISOString()
+    };
+    state.history = state.history.filter(r => !(r.year === year && r.month === month));
+    state.history.push(record);
+  }
+
+  function attachKantongActionEvents() {
+    root.querySelector('[data-action="reset-all"]').addEventListener('click', () => {
+      uiState.confirmModal = {
+        message: 'Yakin ingin menghapus semua data dan mengembalikan ke pengaturan awal? Riwayat bulan-bulan sebelumnya juga akan terhapus.',
+        confirmLabel: 'Ya, reset semua',
+        onConfirm: async () => { state = defaultState(); await saveState(); }
+      };
+      render();
+    });
+
+    root.querySelector('[data-action="close-month"]').addEventListener('click', () => {
+      uiState.confirmModal = {
+        message: 'Tutup bulan ini? Ringkasan bulan ini akan disimpan ke riwayat (bisa dilihat di halaman Tabel), lalu catatan Kebutuhan Pokok, Tambahan, dan Cicilan dikosongkan untuk bulan baru (saldo Dana Darurat, Tabungan, dan Investasi tetap tersimpan).',
+        confirmLabel: 'Ya, tutup bulan ini',
+        safe: true,
+        onConfirm: async () => {
+          archiveCurrentMonth();
+          state.pokok.transactions = [];
+          state.tambahan.transactions = [];
+          state.utang.transactions = [];
+          await saveState();
+        }
+      };
+      render();
+    });
+  }
+
+  function attachCardEvents() {
+    // generic pct setters
+    root.querySelectorAll('[data-action="set-pct"]').forEach(el => {
+      el.addEventListener('change', async (e) => {
+        const cat = e.target.getAttribute('data-cat');
+        const val = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+        if (cat === 'utang') state.utang.pct = val; else state[cat].pct = val;
+        render(); await saveState();
+      });
+    });
+
+    root.querySelectorAll('[data-action="add-tx"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const cat = e.target.getAttribute('data-cat');
+        const noteInput = root.querySelector(`[data-role="note-${cat}"]`);
+        const amountInput = root.querySelector(`[data-role="amount-${cat}"]`);
+        const dateInput = root.querySelector(`[data-role="txdate-${cat}"]`);
+        const amount = parseMoneyString(amountInput.value);
+        if (!amount || amount <= 0) { amountInput.focus(); return; }
+        state[cat].transactions.push({ id: uid(), note: noteInput.value.trim(), amount, date: (dateInput && dateInput.value) || todayStr() });
+        render(); await saveState();
+      });
+    });
+
+    root.querySelectorAll('[data-action="del-tx"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const cat = e.currentTarget.getAttribute('data-cat');
+        const id = e.currentTarget.getAttribute('data-id');
+        state[cat].transactions = state[cat].transactions.filter(t => t.id !== id);
+        render(); await saveState();
+      });
+    });
+
+    // darurat
+    const daruratMonths = root.querySelector('[data-action="set-darurat-months"]');
+    if (daruratMonths) daruratMonths.addEventListener('change', async (e) => {
+      state.darurat.targetMonths = Math.max(1, Number(e.target.value) || 1);
+      render(); await saveState();
+    });
+    const daruratPct = root.querySelector('[data-action="set-darurat-pct"]');
+    if (daruratPct) daruratPct.addEventListener('change', async (e) => {
+      state.darurat.pct = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+      render(); await saveState();
+    });
+    const addDarurat = root.querySelector('[data-action="add-tx-darurat"]');
+    if (addDarurat) addDarurat.addEventListener('click', async () => {
+      const type = root.querySelector('[data-role="type-darurat"]').value;
+      const noteInput = root.querySelector('[data-role="note-darurat"]');
+      const amountInput = root.querySelector('[data-role="amount-darurat"]');
+      const dateInput = root.querySelector('[data-role="txdate-darurat"]');
+      const amount = parseMoneyString(amountInput.value);
+      if (!amount || amount <= 0) { amountInput.focus(); return; }
+      state.darurat.transactions.push({ id: uid(), type, note: noteInput.value.trim(), amount, date: (dateInput && dateInput.value) || todayStr() });
+      render(); await saveState();
+    });
+    root.querySelectorAll('[data-action="del-tx-darurat"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        state.darurat.transactions = state.darurat.transactions.filter(t => t.id !== id);
+        render(); await saveState();
+      });
+    });
+
+    // tabungan goals
+    root.querySelectorAll('[data-action="set-goal-target"]').forEach(el => {
+      el.addEventListener('change', async (e) => {
+        const goalId = e.currentTarget.getAttribute('data-goal');
+        const goal = state.tabungan.goals.find(g => g.id === goalId);
+        if (!goal) return;
+        const newTarget = parseMoneyString(e.currentTarget.value);
+        goal.target = Math.max(0, newTarget);
+        render(); await saveState();
+      });
+    });
+    const toggleAddGoal = root.querySelector('[data-action="toggle-add-goal"]');
+    if (toggleAddGoal) toggleAddGoal.addEventListener('click', () => {
+      uiState.addGoalOpen = !uiState.addGoalOpen;
+      render();
+    });
+    const confirmAddGoal = root.querySelector('[data-action="confirm-add-goal"]');
+    if (confirmAddGoal) confirmAddGoal.addEventListener('click', async () => {
+      const nameInput = root.querySelector('[data-role="new-goal-name"]');
+      const targetInput = root.querySelector('[data-role="new-goal-target"]');
+      const name = nameInput.value.trim();
+      const target = parseMoneyString(targetInput.value);
+      if (!name) { nameInput.focus(); return; }
+      if (!target || target <= 0) { targetInput.focus(); return; }
+      state.tabungan.goals.push({ id: uid(), name, target, transactions: [] });
+      uiState.addGoalOpen = false;
+      render(); await saveState();
+    });
+    root.querySelectorAll('[data-action="del-goal"]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        const goalId = e.currentTarget.getAttribute('data-goal');
+        uiState.confirmModal = {
+          message: 'Hapus tujuan tabungan ini beserta seluruh riwayatnya?',
+          confirmLabel: 'Ya, hapus',
+          onConfirm: async () => {
+            state.tabungan.goals = state.tabungan.goals.filter(g => g.id !== goalId);
+            await saveState();
+          }
+        };
+        render();
+      });
+    });
+    root.querySelectorAll('[data-action="add-goal-tx"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const goalId = e.currentTarget.getAttribute('data-goal');
+        const noteInput = root.querySelector(`[data-role="goal-note-${goalId}"]`);
+        const amountInput = root.querySelector(`[data-role="goal-amount-${goalId}"]`);
+        const dateInput = root.querySelector(`[data-role="goal-date-${goalId}"]`);
+        const amount = parseMoneyString(amountInput.value);
+        if (!amount || amount <= 0) { amountInput.focus(); return; }
+        const goal = state.tabungan.goals.find(g => g.id === goalId);
+        goal.transactions.push({ id: uid(), note: noteInput.value.trim(), amount, date: (dateInput && dateInput.value) || todayStr() });
+        render(); await saveState();
+      });
+    });
+
+    // investasi
+    const addInvestasi = root.querySelector('[data-action="add-tx-investasi"]');
+    if (addInvestasi) addInvestasi.addEventListener('click', async () => {
+      const instrument = root.querySelector('[data-role="instrument-investasi"]').value;
+      const noteInput = root.querySelector('[data-role="note-investasi"]');
+      const amountInput = root.querySelector('[data-role="amount-investasi"]');
+      const dateInput = root.querySelector('[data-role="txdate-investasi"]');
+      const amount = parseMoneyString(amountInput.value);
+      if (!amount || amount <= 0) { amountInput.focus(); return; }
+      state.investasi.transactions.push({ id: uid(), instrument, note: noteInput.value.trim(), amount, date: (dateInput && dateInput.value) || todayStr() });
+      render(); await saveState();
+    });
+    root.querySelectorAll('[data-action="del-tx-investasi"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        state.investasi.transactions = state.investasi.transactions.filter(t => t.id !== id);
+        render(); await saveState();
+      });
+    });
+
+    // utang enable
+    const enableUtang = root.querySelector('[data-action="enable-utang"]');
+    if (enableUtang) enableUtang.addEventListener('click', async () => {
+      state.utang.enabled = true;
+      state.utang.pct = state.utang.pct || 10;
+      render(); await saveState();
+    });
+
+    // calculator (estimasi kebutuhan)
+    root.querySelectorAll('[data-action="toggle-calc"]').forEach(el => {
+      el.addEventListener('click', () => {
+        const cat = el.getAttribute('data-cat');
+        uiState.calcOpen[cat] = !uiState.calcOpen[cat];
+        render();
+      });
+    });
+    root.querySelectorAll('[data-action="add-calc-row"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const cat = e.currentTarget.getAttribute('data-cat');
+        const nameInput = root.querySelector(`[data-role="calc-name-${cat}"]`);
+        const perUnitInput = root.querySelector(`[data-role="calc-perunit-${cat}"]`);
+        const qtyInput = root.querySelector(`[data-role="calc-qty-${cat}"]`);
+        const perUnit = parseMoneyString(perUnitInput.value);
+        const qty = Number(qtyInput.value);
+        const itemName = nameInput.value.trim();
+        if (!itemName) { nameInput.focus(); return; }
+        if (!perUnit || perUnit <= 0 || !qty || qty <= 0) {
+          (perUnit > 0 ? qtyInput : perUnitInput).focus();
+          return;
+        }
+        state[cat].calc.push({ id: uid(), name: itemName, perUnit, qty });
+        uiState.calcOpen[cat] = true;
+        render(); await saveState();
+      });
+    });
+    root.querySelectorAll('[data-action="del-calc-row"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const cat = e.currentTarget.getAttribute('data-cat');
+        const id = e.currentTarget.getAttribute('data-id');
+        state[cat].calc = state[cat].calc.filter(r => r.id !== id);
+        uiState.calcOpen[cat] = true;
+        render(); await saveState();
+      });
+    });
+    root.querySelectorAll('[data-action="add-calc-to-tx"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const cat = e.currentTarget.getAttribute('data-cat');
+        const id = e.currentTarget.getAttribute('data-id');
+        const row = state[cat].calc.find(r => r.id === id);
+        if (!row) return;
+        state[cat].transactions.push({ id: uid(), note: row.name, amount: row.perUnit * row.qty, date: new Date().toISOString() });
+        state[cat].calc = state[cat].calc.filter(r => r.id !== id);
+        uiState.calcOpen[cat] = true;
+        render(); await saveState();
+      });
+    });
+    root.querySelectorAll('[data-action="add-all-calc-to-tx"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const cat = e.currentTarget.getAttribute('data-cat');
+        (state[cat].calc || []).forEach(row => {
+          state[cat].transactions.push({ id: uid(), note: row.name, amount: row.perUnit * row.qty, date: new Date().toISOString() });
+        });
+        state[cat].calc = [];
+        uiState.calcOpen[cat] = true;
+        render(); await saveState();
+      });
+    });
+    root.querySelectorAll('[data-action="use-calc"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const cat = e.currentTarget.getAttribute('data-cat');
+        const rows = state[cat].calc || [];
+        const total = rows.reduce((s, r) => s + (r.perUnit * r.qty), 0);
+        if (totalIncome() <= 0) return;
+        state[cat].pct = Math.max(0, Math.min(100, Math.round((total / totalIncome()) * 100)));
+        uiState.calcOpen[cat] = true;
+        render(); await saveState();
+      });
+    });
+
+    // enter-to-submit
+    root.querySelectorAll('.calc-add input').forEach(input => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const container = input.closest('.calc-add');
+          const btn = container.querySelector('button');
+          if (btn) btn.click();
+        }
+      });
+    });
+    root.querySelectorAll('.add-tx input').forEach(input => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const container = input.closest('.add-tx');
+          const btn = container.querySelector('button');
+          if (btn) btn.click();
+        }
+      });
+    });
+  }
+
+  loadState();
+})();
+</script>
+</body>
+</html>
