@@ -8,6 +8,9 @@
 <body style="margin:0;padding:0;">
 <div id="app-root"></div>
 <div id="rab-print-area"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   html, body { margin: 0; padding: 0; background: #FBF8F1; }
   #app-root {
@@ -38,6 +41,17 @@
     content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px; background: var(--paper);
     clip-path: polygon(0 100%, 100% 100%, 100% 0, 97% 100%, 94% 0, 91% 100%, 88% 0, 85% 100%, 82% 0, 79% 100%, 76% 0, 73% 100%, 70% 0, 67% 100%, 64% 0, 61% 100%, 58% 0, 55% 100%, 52% 0, 49% 100%, 46% 0, 43% 100%, 40% 0, 37% 100%, 34% 0, 31% 100%, 28% 0, 25% 100%, 22% 0, 19% 100%, 16% 0, 13% 100%, 10% 0, 7% 100%, 4% 0, 1% 100%, 0 0);
   }
+  .auth-bar {
+    max-width: 960px; margin: 0 auto 14px; display: flex; justify-content: flex-end;
+  }
+  .auth-user, .auth-guest { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #C9D6CC; }
+  .auth-avatar { width: 22px; height: 22px; border-radius: 50%; }
+  .auth-cloud-tag { background: rgba(255,255,255,0.12); padding: 2px 8px; border-radius: 10px; font-size: 10.5px; }
+  .auth-bar button {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff;
+    font-size: 11px; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-family: inherit;
+  }
+  .auth-bar button:hover { background: rgba(255,255,255,0.2); }
   .header-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; max-width: 960px; margin: 0 auto; flex-wrap: wrap; }
   .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-soft); margin: 0 0 4px; }
   .title { font-family: Georgia, 'Times New Roman', serif; font-size: 26px; margin: 0; font-weight: 600; }
@@ -323,6 +337,14 @@
   .lap-alloc-pct { font-size: 18px; font-weight: 700; color: var(--forest); }
   .lap-alloc-name { font-size: 11.5px; color: var(--ink-soft); margin-bottom: 4px; }
   .lap-alloc-amt { font-size: 11.5px; margin-bottom: 6px; }
+  .lap-tagihan-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px dashed var(--line); gap: 8px; }
+  .lap-tagihan-row:last-child { border-bottom: none; }
+  .lap-tagihan-name { font-size: 12px; font-weight: 600; }
+  .lap-tagihan-date { font-size: 10.5px; color: var(--ink-soft); }
+  .lap-tagihan-right { display: flex; align-items: center; gap: 8px; }
+  .lap-status { font-size: 9.5px; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: 0.03em; white-space: nowrap; }
+  .lap-status-lunas { background: #E7F0EA; color: #2F5A40; }
+  .lap-status-menunggu { background: #FBF0DC; color: #8A6A20; }
   .lap-notes { width: 100%; min-height: 90px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-family: inherit; font-size: 13px; resize: vertical; }
   .lap-actions { display: flex; justify-content: center; margin: 16px 0 6px; }
 
@@ -355,6 +377,42 @@
 (function() {
   const STORAGE_KEY = 'kantong-keuangan-v2-data';
   const INSTRUMENTS = ['Kas/Deposito', 'Reksadana', 'Obligasi', 'Saham', 'Emas', 'Lainnya'];
+
+  // ============================================================
+  // KONFIGURASI CLOUD (FIREBASE) — OPSIONAL
+  // Isi objek di bawah dengan config project Firebase-mu sendiri
+  // (Firebase Console > Project Settings > General > Your apps > SDK setup).
+  // Kalau dibiarkan seperti ini (placeholder "GANTI_..."), aplikasi akan
+  // otomatis berjalan mode lokal saja (localStorage), tidak akan error.
+  // ============================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyCxYLncEBlAU3CewVXN5GUEMs4c1xLb7yI",
+    authDomain: "cashflow-meelomil.firebaseapp.com",
+    projectId: "cashflow-meelomil",
+    storageBucket: "cashflow-meelomil.firebasestorage.app",
+    messagingSenderId: "625081613402",
+    appId: "1:625081613402:web:c8892ee087ec4fb2532c63"
+  };
+
+  let cloudReady = false;
+  let firebaseAuthRef = null;
+  let firebaseDbRef = null;
+  let currentUser = null;
+
+  (function initFirebase() {
+    const isConfigured = firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith('GANTI_');
+    if (!isConfigured || typeof firebase === 'undefined') return;
+    try {
+      firebase.initializeApp(firebaseConfig);
+      firebaseAuthRef = firebase.auth();
+      firebaseDbRef = firebase.firestore();
+      cloudReady = true;
+    } catch (e) {
+      console.error('Gagal inisialisasi Firebase:', e);
+      cloudReady = false;
+    }
+  })();
+
   const uiState = { calcOpen: {}, view: 'kantong', confirmModal: null, addGoalOpen: false, addIncomeOpen: false, harianYear: new Date().getFullYear(), harianMonth: new Date().getMonth(), harianSelectedDate: null, addPlanOpen: false, openPlanId: null };
 
   function formatRupiah(n) {
@@ -426,22 +484,47 @@
     }
   });
 
+  // Storage adapter: window.storage tersedia di Claude.ai (artifact sandbox).
+  // Saat dijalankan mandiri (GitHub Pages, file lokal, hosting lain), window.storage
+  // tidak ada — fallback ke localStorage browser supaya data tetap tersimpan.
+  // Kalau Firebase dikonfigurasi & user masuk dengan Google, data disimpan di
+  // Firestore (cloud) supaya bisa diakses dari perangkat mana pun dengan akun sama.
+  const hasNativeStorage = typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+  const storageAdapter = hasNativeStorage ? window.storage : {
+    async get(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw == null) return null;
+        return { key, value: raw };
+      } catch (e) { return null; }
+    },
+    async set(key, value) {
+      try {
+        localStorage.setItem(key, value);
+        return { key, value };
+      } catch (e) { return null; }
+    }
+  };
+
+  function normalizeState() {
+    const d = defaultState();
+    Object.keys(d).forEach(k => { if (state[k] === undefined) state[k] = d[k]; });
+    if (!state.tabungan.goals) state.tabungan.goals = d.tabungan.goals;
+    if (!state.utang) state.utang = d.utang;
+    if (!state.pokok.calc) state.pokok.calc = [];
+    if (!state.tambahan.calc) state.tambahan.calc = [];
+    if (!state.history) state.history = [];
+    if (!state.incomeExtra) state.incomeExtra = [];
+    if (!state.budgetPlans) state.budgetPlans = [];
+    if (state.notes == null) state.notes = '';
+  }
+
   async function loadState() {
     try {
-      const result = await window.storage.get(STORAGE_KEY, false);
+      const result = await storageAdapter.get(STORAGE_KEY, false);
       if (result && result.value) {
         state = JSON.parse(result.value);
-        const d = defaultState();
-        // fill in any missing fields from schema updates
-        Object.keys(d).forEach(k => { if (state[k] === undefined) state[k] = d[k]; });
-        if (!state.tabungan.goals) state.tabungan.goals = d.tabungan.goals;
-        if (!state.utang) state.utang = d.utang;
-        if (!state.pokok.calc) state.pokok.calc = [];
-        if (!state.tambahan.calc) state.tambahan.calc = [];
-        if (!state.history) state.history = [];
-        if (!state.incomeExtra) state.incomeExtra = [];
-        if (!state.budgetPlans) state.budgetPlans = [];
-        if (state.notes == null) state.notes = '';
+        normalizeState();
       } else {
         state = defaultState();
       }
@@ -451,9 +534,68 @@
     render();
   }
 
+  async function loadStateFromCloud() {
+    if (!cloudReady || !currentUser) return;
+    try {
+      const docRef = firebaseDbRef.collection('kantong_keuangan_users').doc(currentUser.uid);
+      const snap = await docRef.get();
+      if (snap.exists && snap.data().stateJson) {
+        state = JSON.parse(snap.data().stateJson);
+        normalizeState();
+      } else {
+        // belum ada data cloud untuk akun ini — unggah data lokal saat ini sebagai data awal
+        await docRef.set({ stateJson: JSON.stringify(state), updatedAt: new Date().toISOString() });
+      }
+    } catch (e) {
+      console.error('Gagal memuat data cloud:', e);
+      uiState.confirmModal = { message: 'Gagal memuat data dari cloud. Periksa koneksi internet dan konfigurasi Firebase.', confirmLabel: 'Oke', safe: true, onConfirm: async () => {} };
+    }
+    render();
+  }
+
   async function saveState() {
-    try { await window.storage.set(STORAGE_KEY, JSON.stringify(state), false); }
+    if (cloudReady && currentUser) {
+      try {
+        await firebaseDbRef.collection('kantong_keuangan_users').doc(currentUser.uid).set({
+          stateJson: JSON.stringify(state), updatedAt: new Date().toISOString()
+        });
+        return;
+      } catch (e) {
+        console.error('Gagal menyimpan ke cloud, fallback ke lokal:', e);
+      }
+    }
+    try { await storageAdapter.set(STORAGE_KEY, JSON.stringify(state), false); }
     catch (e) { console.error('Gagal menyimpan data', e); }
+  }
+
+  async function signInWithGoogle() {
+    if (!cloudReady) return;
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await firebaseAuthRef.signInWithPopup(provider);
+    } catch (e) {
+      console.error('Gagal masuk dengan Google:', e);
+      uiState.confirmModal = { message: 'Gagal masuk dengan Google: ' + e.message, confirmLabel: 'Oke', safe: true, onConfirm: async () => {} };
+      render();
+    }
+  }
+
+  async function signOutUser() {
+    if (!cloudReady) return;
+    try { await firebaseAuthRef.signOut(); } catch (e) { console.error(e); }
+    currentUser = null;
+    await loadState();
+  }
+
+  if (cloudReady) {
+    firebaseAuthRef.onAuthStateChanged(async (user) => {
+      currentUser = user;
+      if (user) {
+        await loadStateFromCloud();
+      } else {
+        render();
+      }
+    });
   }
 
   function escapeHtml(str) {
@@ -504,6 +646,21 @@
 
     root.innerHTML = `
       <div class="header">
+        <div class="auth-bar">
+          ${currentUser ? `
+            <div class="auth-user">
+              ${currentUser.photoURL ? `<img src="${currentUser.photoURL}" class="auth-avatar" referrerpolicy="no-referrer">` : ''}
+              <span>${escapeHtml(currentUser.displayName || currentUser.email || 'Akun')}</span>
+              <span class="auth-cloud-tag">☁ Tersimpan di cloud</span>
+              <button data-action="sign-out">Keluar</button>
+            </div>
+          ` : `
+            <div class="auth-guest">
+              <span>${cloudReady ? 'Data tersimpan di perangkat ini saja.' : 'Mode lokal (cloud belum dikonfigurasi).'}</span>
+              ${cloudReady ? '<button data-action="sign-in">🔐 Masuk dengan Google untuk simpan di cloud</button>' : ''}
+            </div>
+          `}
+        </div>
         <div class="header-top">
           <div>
             <p class="eyebrow">Kantong Keuangan</p>
@@ -1664,9 +1821,14 @@
     ];
     if (state.utang.enabled) allocRows.push({ name: 'Cicilan / Utang', pct: state.utang.pct, target: utangTg, realisasi: utangSp });
 
+    const tagihanRows = state.utang.enabled ? state.utang.transactions.filter(t => isThisMonth(t.date)).map(t => ({ date: t.date, name: t.note || 'Cicilan', amount: t.amount, status: 'LUNAS' })) : [];
+    state.budgetPlans.forEach(p => p.items.forEach(it => {
+      if (!it.done) tagihanRows.push({ date: null, name: p.name + ': ' + it.name, amount: (Number(it.qty) || 0) * (Number(it.price) || 0), status: 'MENUNGGU' });
+    }));
+
     return {
       income, totalPengeluaran, cashflow, kekayaan,
-      rincianPemasukan, rincianPengeluaran, tabunganRows, allocRows,
+      rincianPemasukan, rincianPengeluaran, tabunganRows, allocRows, tagihanRows,
       periodLabel: MONTHS_FULL[new Date().getMonth()] + ' ' + new Date().getFullYear()
     };
   }
@@ -1703,6 +1865,19 @@
       `;
     }).join('');
 
+    const tagihanHtml = d.tagihanRows.length === 0 ? '<p class="empty-stat">Tidak ada tagihan/cicilan tercatat.</p>' : d.tagihanRows.map(t => `
+      <div class="lap-tagihan-row">
+        <div>
+          <div class="lap-tagihan-name">${escapeHtml(t.name)}</div>
+          ${t.date ? `<div class="lap-tagihan-date">${formatDateShort(t.date)}</div>` : ''}
+        </div>
+        <div class="lap-tagihan-right">
+          <span class="num">${formatRupiah(t.amount)}</span>
+          <span class="lap-status ${t.status === 'LUNAS' ? 'lap-status-lunas' : 'lap-status-menunggu'}">${t.status}</span>
+        </div>
+      </div>
+    `).join('');
+
     return `
       <div class="lap-header">
         <div>
@@ -1735,7 +1910,7 @@
         </div>
       </div>
 
-      <div class="lap-grid-2">
+      <div class="lap-grid-3">
         <div class="stat-section">
           <h3>Rincian Pemasukan</h3>
           <table class="stat-table"><tbody>${pemasukanRows}
@@ -1747,6 +1922,10 @@
           <div class="table-scroll"><table class="stat-table"><thead><tr><th>Tanggal</th><th>Kategori</th><th>Catatan</th><th>Jumlah</th></tr></thead><tbody>${pengeluaranRows}
             <tr style="font-weight:700;background:#F3EEDD;"><td colspan="3">TOTAL PENGELUARAN</td><td class="rab-r num">${formatRupiah(d.totalPengeluaran)}</td></tr>
           </tbody></table></div>
+        </div>
+        <div class="stat-section">
+          <h3>Tagihan &amp; Rencana Aktif</h3>
+          ${tagihanHtml}
         </div>
       </div>
 
@@ -1774,6 +1953,7 @@
     const pemasukanRows = d.rincianPemasukan.map(r => `<tr><td>${escapeHtml(r.name)}</td><td class="rab-r num">${formatRupiah(r.amount)}</td></tr>`).join('');
     const pengeluaranRows = d.rincianPengeluaran.length === 0 ? '<tr><td colspan="4" style="text-align:center;">Belum ada catatan bulan ini</td></tr>' : d.rincianPengeluaran.map(r => `<tr><td class="num">${formatDateShort(r.date)}</td><td>${escapeHtml(r.kategori)}</td><td>${escapeHtml(r.note || '-')}</td><td class="rab-r num">${formatRupiah(r.amount)}</td></tr>`).join('');
     const allocRows = d.allocRows.map(a => `<tr><td>${escapeHtml(a.name)}</td><td class="rab-c num">${a.pct}%</td><td class="rab-r num">${formatRupiah(a.realisasi)}</td><td class="rab-r num">${a.target > 0 ? formatRupiah(a.target) : '-'}</td></tr>`).join('');
+    const tagihanRowsHtml = d.tagihanRows.length === 0 ? '<tr><td colspan="3" style="text-align:center;">Tidak ada tagihan/rencana tercatat</td></tr>' : d.tagihanRows.map(t => `<tr><td>${escapeHtml(t.name)}</td><td class="rab-r num">${formatRupiah(t.amount)}</td><td class="rab-c">${t.status}</td></tr>`).join('');
 
     return `
       <div class="rab-doc">
@@ -1798,6 +1978,9 @@
         <table class="rab-table"><thead><tr><th>Tanggal</th><th>Kategori</th><th>Catatan</th><th>Jumlah</th></tr></thead><tbody>${pengeluaranRows}
           <tr class="rab-grand-row"><td colspan="3"><b>TOTAL</b></td><td class="rab-r"><b>Rp ${formatRABNumber(d.totalPengeluaran)}</b></td></tr>
         </tbody></table>
+
+        <h3 style="color:#1B4332;font-size:13px;margin:14px 0 6px;">Tagihan &amp; Rencana Aktif</h3>
+        <table class="rab-table"><thead><tr><th>Nama</th><th>Jumlah</th><th>Status</th></tr></thead><tbody>${tagihanRowsHtml}</tbody></table>
 
         <h3 style="color:#1B4332;font-size:13px;margin:14px 0 6px;">Alokasi Budget</h3>
         <table class="rab-table"><thead><tr><th>Kantong</th><th>%</th><th>Realisasi</th><th>Target</th></tr></thead><tbody>${allocRows}</tbody></table>
@@ -2138,6 +2321,11 @@
       state.income = Math.max(0, parseMoneyString(e.target.value));
       render(); await saveState();
     });
+
+    const signInBtn = root.querySelector('[data-action="sign-in"]');
+    if (signInBtn) signInBtn.addEventListener('click', signInWithGoogle);
+    const signOutBtn = root.querySelector('[data-action="sign-out"]');
+    if (signOutBtn) signOutBtn.addEventListener('click', signOutUser);
 
     const toggleIncomeBtn = root.querySelector('[data-action="toggle-add-income"]');
     if (toggleIncomeBtn) toggleIncomeBtn.addEventListener('click', () => {
