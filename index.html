@@ -655,7 +655,7 @@
     }
   })();
 
-  const uiState = { calcOpen: {}, view: 'kantong', confirmModal: null, addGoalOpen: false, addIncomeOpen: false, harianYear: new Date().getFullYear(), harianMonth: new Date().getMonth(), harianSelectedDate: null, addPlanOpen: false, openPlanId: null, wizardOpen: false, wizardStep: 0, wizardAnswers: {}, faqOpen: {}, pokokNominalMode: false };
+  const uiState = { calcOpen: {}, view: 'kantong', confirmModal: null, addGoalOpen: false, addIncomeOpen: false, addUtangItemOpen: false, harianYear: new Date().getFullYear(), harianMonth: new Date().getMonth(), harianSelectedDate: null, addPlanOpen: false, openPlanId: null, wizardOpen: false, wizardStep: 0, wizardAnswers: {}, faqOpen: {}, pokokNominalMode: false };
 
   // ===== AI KONSULTAN STATE =====
   const aiState = {
@@ -862,7 +862,7 @@
       ] },
       investasi: { pct: 15, transactions: [] },
       tambahan: { pct: 10, transactions: [], calc: [] },
-      utang: { enabled: false, pct: 0, transactions: [] },
+      utang: { enabled: false, pct: 0, transactions: [], items: [] },
       history: [],
       budgetPlans: [],
       notes: ''
@@ -911,6 +911,7 @@
     Object.keys(d).forEach(k => { if (state[k] === undefined) state[k] = d[k]; });
     if (!state.tabungan.goals) state.tabungan.goals = d.tabungan.goals;
     if (!state.utang) state.utang = d.utang;
+    if (!state.utang.items) state.utang.items = [];
     if (!state.pokok.calc) state.pokok.calc = [];
     if (state.pokok.nominalOverride === undefined) state.pokok.nominalOverride = null;
     if (!state.tambahan.calc) state.tambahan.calc = [];
@@ -1042,7 +1043,12 @@
   function tambahanTarget() { return totalIncome() * (Number(state.tambahan.pct) || 0) / 100; }
   function tambahanSpent() { return state.tambahan.transactions.reduce((s, t) => s + t.amount, 0); }
 
-  function utangTarget() { return totalIncome() * (Number(state.utang.pct) || 0) / 100; }
+  function utangItemsTotal() { return (state.utang.items || []).reduce((s, it) => s + (Number(it.amount) || 0), 0); }
+  function utangTarget() {
+    const itemsTotal = utangItemsTotal();
+    if (itemsTotal > 0) return itemsTotal;
+    return totalIncome() * (Number(state.utang.pct) || 0) / 100;
+  }
   function utangSpent() { return state.utang.transactions.reduce((s, t) => s + t.amount, 0); }
 
   function totalPct() {
@@ -3421,39 +3427,86 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
     if (!state.utang.enabled) {
       return `<button class="add-pocket-btn" data-action="enable-utang">+ Tambah Pos Cicilan / Utang (opsional)</button>`;
     }
-    const target = utangTarget();
+
+    const items = state.utang.items || [];
+    const totalItemsNominal = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+    const inc = totalIncome();
+
+    // Hitung pct otomatis dari total nominal cicilan jika ada items
+    const effectivePct = inc > 0 && totalItemsNominal > 0
+      ? Math.round((totalItemsNominal / inc) * 100)
+      : (Number(state.utang.pct) || 0);
+
+    const target = inc * effectivePct / 100;
     const spent = utangSpent();
     const pctUsed = target > 0 ? Math.min(100, (spent / target) * 100) : (spent > 0 ? 100 : 0);
     const over = spent > target && target > 0;
-    const overBudget = totalIncome() > 0 && (Number(state.utang.pct) || 0) > 30;
+    const overBudget = inc > 0 && effectivePct > 30;
+
+    const itemsHtml = items.length === 0
+      ? `<li class="tx-empty">Belum ada cicilan terdaftar</li>`
+      : items.map(it => `
+          <li>
+            <span class="note">${escapeHtml(it.name)}</span>
+            <span class="amt num" style="white-space:nowrap">${formatRupiah(it.amount)}<span style="font-size:10px;color:var(--ink-soft)">/bln</span></span>
+            <button data-action="del-utang-item" data-id="${it.id}" title="Hapus cicilan ini (sudah lunas)" style="color:var(--brick);border:none;background:none;cursor:pointer;font-size:13px;opacity:0.6;padding:0 2px;">✕</button>
+          </li>`).join('');
+
     const txHtml = state.utang.transactions.length === 0
-      ? '<li class="tx-empty">Belum ada catatan</li>'
+      ? '<li class="tx-empty">Belum ada catatan pembayaran</li>'
       : state.utang.transactions.slice().reverse().map(t => `
           <li><span class="tx-date-badge num">${formatDateShort(t.date)}</span><span class="note">${escapeHtml(t.note || '(tanpa catatan)')}</span>
           <span class="amt">${formatRupiah(t.amount)}</span>
           <button data-action="del-tx" data-cat="utang" data-id="${t.id}" title="Hapus">✕</button></li>
         `).join('');
+
     return `
       <div class="envelope">
         <div class="step-badge" style="--step-color:#7A6C5D">$</div>
         <div class="envelope-body">
           <div class="envelope-head">
             <div><p class="envelope-name">Cicilan / Utang</p><p class="envelope-desc">KPR, kendaraan, kartu kredit, dll</p></div>
-            <span class="pct-editable"><input class="pct-input num" type="number" min="0" max="100" data-action="set-pct" data-cat="utang" value="${state.utang.pct}">% / bulan<span class="pct-nominal num">≈ ${pctNominal(state.utang.pct)}</span></span>
+            <span class="pct-editable num" style="font-size:12px;color:var(--ink-soft);text-align:right">
+              ${totalItemsNominal > 0
+                ? `<b class="num" style="font-size:13px;color:var(--ink)">${effectivePct}%</b> / bulan<span class="pct-nominal num">≈ ${formatRupiah(totalItemsNominal)}</span>`
+                : `<input class="pct-input num" type="number" min="0" max="100" data-action="set-pct" data-cat="utang" value="${state.utang.pct}">% / bulan<span class="pct-nominal num">≈ ${pctNominal(state.utang.pct)}</span>`
+              }
+            </span>
           </div>
           ${overBudget ? '<div class="achieved-banner" style="background:#F6E7E6;border-color:var(--brick);color:#7A2E29;">⚠ Total cicilan disarankan tidak lebih dari 30% penghasilan.</div>' : ''}
-          <div class="env-bar-track"><div class="env-bar-fill" style="width:${pctUsed}%; background:${over ? 'var(--brick)' : '#7A6C5D'}"></div></div>
-          <div class="env-numbers">
-            <span class="spent num" style="${over ? 'color:var(--brick)' : ''}">${formatRupiah(spent)} terpakai</span>
-            <span class="target num">dari ${formatRupiah(target)}</span>
+
+          <!-- Daftar Cicilan Aktif -->
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-soft);margin-bottom:5px;font-weight:600">Cicilan Aktif</div>
+            <ul class="tx-list" style="max-height:none">${itemsHtml}</ul>
+            ${uiState.addUtangItemOpen ? `
+              <div class="add-tx" style="margin-top:8px" id="add-utang-item-form">
+                <input class="note" type="text" placeholder="Nama cicilan (mis. Motor, KPR)" data-role="utang-item-name" style="flex:2;min-width:120px">
+                <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Nominal/bulan" data-role="utang-item-amount" style="width:110px">
+                <button data-action="confirm-add-utang-item">+</button>
+                <button data-action="cancel-add-utang-item" style="background:transparent;color:var(--brick);border:1px solid var(--brick)">Batal</button>
+              </div>
+            ` : `
+              <button class="add-goal-btn" data-action="open-add-utang-item" style="margin-top:6px;font-size:12px">+ Tambah Cicilan</button>
+            `}
+            ${items.length > 0 ? `<p style="font-size:10.5px;color:var(--ink-soft);margin:6px 0 0;line-height:1.5">Tekan ✕ pada cicilan yang sudah lunas untuk menghapusnya.</p>` : ''}
           </div>
-          <p class="sisa-line ${over ? 'over' : ''}">${over ? 'Lewat anggaran ' + formatRupiah(spent - target) : 'Sisa ' + formatRupiah(Math.max(0, target - spent))}</p>
-          <ul class="tx-list">${txHtml}</ul>
-          <div class="add-tx">
-            <input class="tx-date" type="date" data-role="txdate-utang" value="${todayStr()}">
-            <input class="note" type="text" placeholder="Catatan cicilan" data-role="note-utang">
-            <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Jumlah" data-role="amount-utang">
-            <button data-action="add-tx" data-cat="utang">+</button>
+
+          <div style="border-top:1px dashed var(--line);padding-top:10px;margin-bottom:6px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-soft);margin-bottom:5px;font-weight:600">Catatan Pembayaran Bulan Ini</div>
+            <div class="env-bar-track"><div class="env-bar-fill" style="width:${pctUsed}%; background:${over ? 'var(--brick)' : '#7A6C5D'}"></div></div>
+            <div class="env-numbers">
+              <span class="spent num" style="${over ? 'color:var(--brick)' : ''}">${formatRupiah(spent)} dibayar</span>
+              <span class="target num">dari ${formatRupiah(target)}</span>
+            </div>
+            <p class="sisa-line ${over ? 'over' : ''}">${over ? 'Lewat anggaran ' + formatRupiah(spent - target) : 'Sisa ' + formatRupiah(Math.max(0, target - spent))}</p>
+            <ul class="tx-list">${txHtml}</ul>
+            <div class="add-tx">
+              <input class="tx-date" type="date" data-role="txdate-utang" value="${todayStr()}">
+              <input class="note" type="text" placeholder="Keterangan (mis. cicilan motor Mei)" data-role="note-utang">
+              <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Jumlah" data-role="amount-utang">
+              <button data-action="add-tx" data-cat="utang">+</button>
+            </div>
           </div>
           <p class="utang-note">Lunasi utang berbunga tinggi (kartu kredit, pinjol) lebih dulu sebelum menambah porsi investasi.</p>
         </div>
@@ -3780,6 +3833,66 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
       state.utang.enabled = true;
       state.utang.pct = state.utang.pct || 10;
       render(); await saveState();
+    });
+
+    // utang items (cicilan tetap)
+    const openAddUtangItem = root.querySelector('[data-action="open-add-utang-item"]');
+    if (openAddUtangItem) openAddUtangItem.addEventListener('click', () => {
+      uiState.addUtangItemOpen = true;
+      render();
+    });
+    const cancelAddUtangItem = root.querySelector('[data-action="cancel-add-utang-item"]');
+    if (cancelAddUtangItem) cancelAddUtangItem.addEventListener('click', () => {
+      uiState.addUtangItemOpen = false;
+      render();
+    });
+    const confirmAddUtangItem = root.querySelector('[data-action="confirm-add-utang-item"]');
+    if (confirmAddUtangItem) confirmAddUtangItem.addEventListener('click', async () => {
+      const nameInput = root.querySelector('[data-role="utang-item-name"]');
+      const amountInput = root.querySelector('[data-role="utang-item-amount"]');
+      const name = nameInput ? nameInput.value.trim() : '';
+      const amount = amountInput ? parseMoneyString(amountInput.value) : 0;
+      if (!name) { if (nameInput) nameInput.focus(); return; }
+      if (!amount || amount <= 0) { if (amountInput) amountInput.focus(); return; }
+      if (!state.utang.items) state.utang.items = [];
+      state.utang.items.push({ id: uid(), name, amount });
+      // Update pct otomatis dari total items
+      const inc = totalIncome();
+      if (inc > 0) {
+        const totalItems = state.utang.items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+        state.utang.pct = Math.round((totalItems / inc) * 100);
+      }
+      uiState.addUtangItemOpen = false;
+      render(); await saveState();
+    });
+    root.querySelectorAll('[data-action="del-utang-item"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        const item = (state.utang.items || []).find(it => it.id === id);
+        uiState.confirmModal = {
+          message: `Hapus cicilan "${item ? item.name : ''}"? Tandai ini jika cicilan sudah lunas atau selesai.`,
+          confirmLabel: 'Ya, sudah lunas',
+          safe: true,
+          onConfirm: async () => {
+            state.utang.items = (state.utang.items || []).filter(it => it.id !== id);
+            // Update pct dari sisa items
+            const inc = totalIncome();
+            if (inc > 0) {
+              const totalItems = state.utang.items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+              state.utang.pct = Math.round((totalItems / inc) * 100);
+            } else {
+              state.utang.pct = 0;
+            }
+            // Jika tidak ada cicilan tersisa, nonaktifkan pos
+            if (state.utang.items.length === 0) {
+              state.utang.enabled = false;
+              state.utang.pct = 0;
+            }
+            await saveState();
+          }
+        };
+        render();
+      });
     });
 
     // calculator (estimasi kebutuhan)
