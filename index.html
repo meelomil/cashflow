@@ -246,7 +246,26 @@
   .close-month-btn:hover { background: var(--gold-soft); }
   .reset-btn:hover { border-color: var(--brick); color: var(--brick); }
 
-  .loading-state { text-align: center; padding: 60px 20px; color: var(--ink-soft); font-size: 13px; }
+  .period-nav {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 20px; padding: 5px 10px; font-size: 12px; color: #fff; white-space: nowrap;
+  }
+  .period-nav button {
+    background: none; border: none; color: rgba(255,255,255,0.75); cursor: pointer;
+    font-size: 16px; line-height: 1; padding: 0 2px; border-radius: 4px;
+  }
+  .period-nav button:hover { color: #fff; background: rgba(255,255,255,0.12); }
+  .period-nav .period-label { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; min-width: 80px; text-align: center; font-weight: 600; letter-spacing: 0.03em; }
+  .period-nav .period-today-btn {
+    font-size: 10px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+    color: #fff; border-radius: 10px; padding: 2px 8px; cursor: pointer; margin-left: 2px;
+  }
+  .period-nav .period-today-btn:hover { background: rgba(255,255,255,0.25); }
+  .period-past-banner {
+    background: #FBF0DC; border: 1px solid var(--gold-soft); border-radius: 8px;
+    padding: 8px 14px; font-size: 12px; color: #7A5A18; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
 
   /* ===== AI KONSULTAN ===== */
   .ai-layout { display: grid; grid-template-columns: 1fr 280px; gap: 16px; align-items: start; }
@@ -655,7 +674,7 @@
     }
   })();
 
-  const uiState = { calcOpen: {}, view: 'kantong', confirmModal: null, addGoalOpen: false, addIncomeOpen: false, addUtangItemOpen: false, harianYear: new Date().getFullYear(), harianMonth: new Date().getMonth(), harianSelectedDate: null, addPlanOpen: false, openPlanId: null, wizardOpen: false, wizardStep: 0, wizardAnswers: {}, faqOpen: {}, pokokNominalMode: false };
+  const uiState = { calcOpen: {}, view: 'kantong', confirmModal: null, addGoalOpen: false, addIncomeOpen: false, addUtangItemOpen: false, harianYear: new Date().getFullYear(), harianMonth: new Date().getMonth(), harianSelectedDate: null, addPlanOpen: false, openPlanId: null, wizardOpen: false, wizardStep: 0, wizardAnswers: {}, faqOpen: {}, pokokNominalMode: false, activePeriodYear: new Date().getFullYear(), activePeriodMonth: new Date().getMonth() };
 
   // ===== AI KONSULTAN STATE =====
   const aiState = {
@@ -1067,7 +1086,13 @@
 
     root.innerHTML = `
       <div class="header">
-        <div class="auth-bar">
+        <div class="auth-bar" style="align-items:center;gap:10px">
+          <div class="period-nav">
+            <button data-action="period-prev" title="Bulan sebelumnya">‹</button>
+            <span class="period-label">${MONTHS_SHORT[uiState.activePeriodMonth]} ${uiState.activePeriodYear}</span>
+            <button data-action="period-next" title="Bulan berikutnya">›</button>
+            ${!isCurrentRealMonth() ? `<button class="period-today-btn" data-action="period-today">Bulan ini</button>` : ''}
+          </div>
           ${currentUser ? `
             <div class="auth-user">
               ${currentUser.photoURL ? `<img src="${currentUser.photoURL}" class="auth-avatar" referrerpolicy="no-referrer">` : ''}
@@ -1089,7 +1114,7 @@
             <p class="subtitle">Urutan di bawah ini ikut prinsip "pay yourself first": kebutuhan pokok dulu, lalu dana darurat & tabungan tujuan disisihkan sebelum uang sempat "menguap", baru investasi, dan kebutuhan tambahan diletakkan paling akhir.</p>
           </div>
           <div class="income-box">
-            <label>Pemasukan Utama Bulan Ini</label>
+            <label>Pemasukan — ${MONTHS_FULL[uiState.activePeriodMonth]} ${uiState.activePeriodYear}</label>
             <input type="text" inputmode="numeric" class="num money-input" id="income-input" value="${formatMoneyString(state.income)}">
             ${(state.incomeExtra || []).length > 0 ? `
               <ul class="income-extra-list">
@@ -1167,6 +1192,12 @@
       attachAIEvents();
     } else {
       viewContainer.innerHTML = `
+        ${!isCurrentRealMonth() ? `
+          <div class="period-past-banner">
+            📅 Melihat data <b>${MONTHS_FULL[uiState.activePeriodMonth]} ${uiState.activePeriodYear}</b> — transaksi dan pengeluaran yang ditampilkan hanya untuk bulan ini.
+            ${uiState.activePeriodMonth > new Date().getMonth() || uiState.activePeriodYear > new Date().getFullYear() ? ' Bulan ini belum terjadi.' : ''}
+          </div>
+        ` : ''}
         <div class="summary-strip">
           <div class="summary-card">
             <div class="label">Total Dialokasikan</div>
@@ -1329,18 +1360,31 @@
   }
 
 
-  function isThisMonth(dateStr) {
+  function activePeriod() {
+    return { year: uiState.activePeriodYear, month: uiState.activePeriodMonth };
+  }
+  function isActivePeriod(dateStr) {
     if (!dateStr) return false;
     const d = new Date(dateStr);
+    const p = activePeriod();
+    return d.getFullYear() === p.year && d.getMonth() === p.month;
+  }
+  function isThisMonth(dateStr) {
+    // alias — semua filter transaksi sekarang pakai periode aktif
+    return isActivePeriod(dateStr);
+  }
+  function isCurrentRealMonth() {
     const now = new Date();
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    return uiState.activePeriodYear === now.getFullYear() && uiState.activePeriodMonth === now.getMonth();
   }
 
   function computeBurn(key, target) {
+    const p = activePeriod();
     const now = new Date();
-    const today = now.getDate();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const spentThisMonth = state[key].transactions.filter(t => isThisMonth(t.date)).reduce((s, t) => s + t.amount, 0);
+    const isCurrentMonth = isCurrentRealMonth();
+    const today = isCurrentMonth ? now.getDate() : new Date(p.year, p.month + 1, 0).getDate();
+    const daysInMonth = new Date(p.year, p.month + 1, 0).getDate();
+    const spentThisMonth = state[key].transactions.filter(t => isActivePeriod(t.date)).reduce((s, t) => s + t.amount, 0);
     const avgPerDay = spentThisMonth / Math.max(1, today);
     const projectedTotal = avgPerDay * daysInMonth;
     let status = 'aman';
@@ -3432,7 +3476,6 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
     const totalItemsNominal = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
     const inc = totalIncome();
 
-    // Hitung pct otomatis dari total nominal cicilan jika ada items
     const effectivePct = inc > 0 && totalItemsNominal > 0
       ? Math.round((totalItemsNominal / inc) * 100)
       : (Number(state.utang.pct) || 0);
@@ -3444,16 +3487,16 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
     const overBudget = inc > 0 && effectivePct > 30;
 
     const itemsHtml = items.length === 0
-      ? `<li class="tx-empty">Belum ada cicilan terdaftar</li>`
+      ? `<li class="tx-empty">Belum ada cicilan — tekan "+ Tambah Cicilan" untuk mulai</li>`
       : items.map(it => `
-          <li>
-            <span class="note">${escapeHtml(it.name)}</span>
-            <span class="amt num" style="white-space:nowrap">${formatRupiah(it.amount)}<span style="font-size:10px;color:var(--ink-soft)">/bln</span></span>
-            <button data-action="del-utang-item" data-id="${it.id}" title="Hapus cicilan ini (sudah lunas)" style="color:var(--brick);border:none;background:none;cursor:pointer;font-size:13px;opacity:0.6;padding:0 2px;">✕</button>
+          <li style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line);gap:8px">
+            <span style="flex:1;font-size:12.5px">${escapeHtml(it.name)}</span>
+            <span class="num" style="font-size:12px;white-space:nowrap;color:var(--ink)">${formatRupiah(it.amount)}<span style="font-size:10px;color:var(--ink-soft)">/bln</span></span>
+            <button data-action="del-utang-item" data-id="${it.id}" title="Tandai lunas / hapus" style="color:var(--brick);border:1px solid var(--brick);background:none;cursor:pointer;font-size:10px;border-radius:4px;padding:2px 6px;white-space:nowrap;opacity:0.75">✓ Lunas</button>
           </li>`).join('');
 
     const txHtml = state.utang.transactions.length === 0
-      ? '<li class="tx-empty">Belum ada catatan pembayaran</li>'
+      ? '<li class="tx-empty">Belum ada catatan pembayaran bulan ini</li>'
       : state.utang.transactions.slice().reverse().map(t => `
           <li><span class="tx-date-badge num">${formatDateShort(t.date)}</span><span class="note">${escapeHtml(t.note || '(tanpa catatan)')}</span>
           <span class="amt">${formatRupiah(t.amount)}</span>
@@ -3465,35 +3508,40 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
         <div class="step-badge" style="--step-color:#7A6C5D">$</div>
         <div class="envelope-body">
           <div class="envelope-head">
-            <div><p class="envelope-name">Cicilan / Utang</p><p class="envelope-desc">KPR, kendaraan, kartu kredit, dll</p></div>
-            <span class="pct-editable num" style="font-size:12px;color:var(--ink-soft);text-align:right">
-              ${totalItemsNominal > 0
-                ? `<b class="num" style="font-size:13px;color:var(--ink)">${effectivePct}%</b> / bulan<span class="pct-nominal num">≈ ${formatRupiah(totalItemsNominal)}</span>`
-                : `<input class="pct-input num" type="number" min="0" max="100" data-action="set-pct" data-cat="utang" value="${state.utang.pct}">% / bulan<span class="pct-nominal num">≈ ${pctNominal(state.utang.pct)}</span>`
-              }
-            </span>
+            <div>
+              <p class="envelope-name">Cicilan / Utang</p>
+              <p class="envelope-desc">KPR, kendaraan, kartu kredit, dll</p>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+              <span class="pct-editable num" style="font-size:12px;color:var(--ink-soft);text-align:right">
+                ${totalItemsNominal > 0
+                  ? `<b class="num" style="font-size:13px;color:var(--ink)">${effectivePct}%</b> / bulan<span class="pct-nominal num">≈ ${formatRupiah(totalItemsNominal)}</span>`
+                  : `<input class="pct-input num" type="number" min="0" max="100" data-action="set-pct" data-cat="utang" value="${state.utang.pct}">% / bulan<span class="pct-nominal num">≈ ${pctNominal(state.utang.pct)}</span>`
+                }
+              </span>
+              <button data-action="disable-utang" style="font-size:10px;background:none;border:1px solid var(--line);color:var(--ink-soft);border-radius:4px;padding:2px 7px;cursor:pointer;">✕ Hapus Pos</button>
+            </div>
           </div>
           ${overBudget ? '<div class="achieved-banner" style="background:#F6E7E6;border-color:var(--brick);color:#7A2E29;">⚠ Total cicilan disarankan tidak lebih dari 30% penghasilan.</div>' : ''}
 
           <!-- Daftar Cicilan Aktif -->
-          <div style="margin-bottom:10px">
-            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-soft);margin-bottom:5px;font-weight:600">Cicilan Aktif</div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-soft);margin-bottom:6px;font-weight:600">Cicilan Aktif</div>
             <ul class="tx-list" style="max-height:none">${itemsHtml}</ul>
             ${uiState.addUtangItemOpen ? `
-              <div class="add-tx" style="margin-top:8px" id="add-utang-item-form">
+              <div class="add-tx" style="margin-top:8px">
                 <input class="note" type="text" placeholder="Nama cicilan (mis. Motor, KPR)" data-role="utang-item-name" style="flex:2;min-width:120px">
                 <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Nominal/bulan" data-role="utang-item-amount" style="width:110px">
                 <button data-action="confirm-add-utang-item">+</button>
-                <button data-action="cancel-add-utang-item" style="background:transparent;color:var(--brick);border:1px solid var(--brick)">Batal</button>
+                <button data-action="cancel-add-utang-item" class="ghost">✕</button>
               </div>
             ` : `
               <button class="add-goal-btn" data-action="open-add-utang-item" style="margin-top:6px;font-size:12px">+ Tambah Cicilan</button>
             `}
-            ${items.length > 0 ? `<p style="font-size:10.5px;color:var(--ink-soft);margin:6px 0 0;line-height:1.5">Tekan ✕ pada cicilan yang sudah lunas untuk menghapusnya.</p>` : ''}
           </div>
 
           <div style="border-top:1px dashed var(--line);padding-top:10px;margin-bottom:6px">
-            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-soft);margin-bottom:5px;font-weight:600">Catatan Pembayaran Bulan Ini</div>
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-soft);margin-bottom:6px;font-weight:600">Catatan Pembayaran Bulan Ini</div>
             <div class="env-bar-track"><div class="env-bar-fill" style="width:${pctUsed}%; background:${over ? 'var(--brick)' : '#7A6C5D'}"></div></div>
             <div class="env-numbers">
               <span class="spent num" style="${over ? 'color:var(--brick)' : ''}">${formatRupiah(spent)} dibayar</span>
@@ -3503,7 +3551,7 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
             <ul class="tx-list">${txHtml}</ul>
             <div class="add-tx">
               <input class="tx-date" type="date" data-role="txdate-utang" value="${todayStr()}">
-              <input class="note" type="text" placeholder="Keterangan (mis. cicilan motor Mei)" data-role="note-utang">
+              <input class="note" type="text" placeholder="Keterangan (mis. cicilan motor Juli)" data-role="note-utang">
               <input class="amount num money-input" type="text" inputmode="numeric" placeholder="Jumlah" data-role="amount-utang">
               <button data-action="add-tx" data-cat="utang">+</button>
             </div>
@@ -3516,6 +3564,26 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
 
   // ---- events ----
   function attachHeaderEvents() {
+    const periodPrev = root.querySelector('[data-action="period-prev"]');
+    if (periodPrev) periodPrev.addEventListener('click', () => {
+      uiState.activePeriodMonth--;
+      if (uiState.activePeriodMonth < 0) { uiState.activePeriodMonth = 11; uiState.activePeriodYear--; }
+      render();
+    });
+    const periodNext = root.querySelector('[data-action="period-next"]');
+    if (periodNext) periodNext.addEventListener('click', () => {
+      uiState.activePeriodMonth++;
+      if (uiState.activePeriodMonth > 11) { uiState.activePeriodMonth = 0; uiState.activePeriodYear++; }
+      render();
+    });
+    const periodToday = root.querySelector('[data-action="period-today"]');
+    if (periodToday) periodToday.addEventListener('click', () => {
+      const now = new Date();
+      uiState.activePeriodYear = now.getFullYear();
+      uiState.activePeriodMonth = now.getMonth();
+      render();
+    });
+
     const incomeInput = document.getElementById('income-input');
     incomeInput.addEventListener('change', async (e) => {
       state.income = Math.max(0, parseMoneyString(e.target.value));
@@ -3656,6 +3724,35 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
     state.pokok.pct = effPokokPct;
     state.pokok.nominalOverride = nominalPokok;
     uiState.pokokNominalMode = true;
+  }
+
+  // Helper: setelah utang.pct ditetapkan dari items, redistribusi kantong lain proporsional
+  // agar total tetap 100%
+  function redistributeForUtang(newUtangPct) {
+    state.utang.pct = newUtangPct;
+    const pokokPct = pokokEffectivePct();
+    const sisaPct = Math.max(0, 100 - pokokPct - newUtangPct);
+    const others = [
+      { key: 'darurat',   weight: Math.max(1, Number(state.darurat.pct)   || 0) },
+      { key: 'tabungan',  weight: Math.max(1, Number(state.tabungan.pct)  || 0) },
+      { key: 'investasi', weight: Math.max(1, Number(state.investasi.pct) || 0) },
+      { key: 'tambahan',  weight: Math.max(1, Number(state.tambahan.pct)  || 0) },
+    ];
+    const totalWeight = others.reduce((s, o) => s + o.weight, 0);
+    let distributed = 0;
+    others.forEach((o, idx) => {
+      if (idx < others.length - 1) {
+        const newPct = Math.round(sisaPct * (o.weight / totalWeight));
+        state[o.key].pct = newPct;
+        distributed += newPct;
+      } else {
+        state[o.key].pct = Math.max(0, sisaPct - distributed);
+      }
+    });
+    // Jika pokok pakai nominalOverride, pastikan pct pokok tetap efektif
+    if (state.pokok.nominalOverride !== null && state.pokok.nominalOverride > 0) {
+      state.pokok.pct = pokokPct;
+    }
   }
 
   function attachCardEvents() {
@@ -3831,8 +3928,28 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
     const enableUtang = root.querySelector('[data-action="enable-utang"]');
     if (enableUtang) enableUtang.addEventListener('click', async () => {
       state.utang.enabled = true;
-      state.utang.pct = state.utang.pct || 10;
+      // Jangan langsung tambah pct — mulai dari 0, user tambah cicilan via items
+      // agar total tidak langsung jadi 110%
+      if (!state.utang.pct) state.utang.pct = 0;
       render(); await saveState();
+    });
+
+    // utang disable (hapus seluruh pos)
+    const disableUtang = root.querySelector('[data-action="disable-utang"]');
+    if (disableUtang) disableUtang.addEventListener('click', () => {
+      uiState.confirmModal = {
+        message: 'Hapus seluruh pos Cicilan/Utang? Semua cicilan aktif dan catatan pembayaran akan dihapus, dan persentasenya dikembalikan ke kantong lain.',
+        confirmLabel: 'Ya, hapus pos ini',
+        onConfirm: async () => {
+          redistributeForUtang(0);
+          state.utang.enabled = false;
+          state.utang.pct = 0;
+          state.utang.items = [];
+          state.utang.transactions = [];
+          await saveState();
+        }
+      };
+      render();
     });
 
     // utang items (cicilan tetap)
@@ -3843,8 +3960,22 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
     });
     const cancelAddUtangItem = root.querySelector('[data-action="cancel-add-utang-item"]');
     if (cancelAddUtangItem) cancelAddUtangItem.addEventListener('click', () => {
-      uiState.addUtangItemOpen = false;
-      render();
+      // Cek apakah ada input yang sudah diisi sebelum menutup
+      const nameInput = root.querySelector('[data-role="utang-item-name"]');
+      const amountInput = root.querySelector('[data-role="utang-item-amount"]');
+      const hasInput = (nameInput && nameInput.value.trim()) || (amountInput && amountInput.value.trim());
+      if (hasInput) {
+        uiState.confirmModal = {
+          message: 'Batalkan tambah cicilan? Data yang sudah diisi akan hilang.',
+          confirmLabel: 'Ya, batalkan',
+          safe: true,
+          onConfirm: async () => { uiState.addUtangItemOpen = false; }
+        };
+        render();
+      } else {
+        uiState.addUtangItemOpen = false;
+        render();
+      }
     });
     const confirmAddUtangItem = root.querySelector('[data-action="confirm-add-utang-item"]');
     if (confirmAddUtangItem) confirmAddUtangItem.addEventListener('click', async () => {
@@ -3856,11 +3987,12 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
       if (!amount || amount <= 0) { if (amountInput) amountInput.focus(); return; }
       if (!state.utang.items) state.utang.items = [];
       state.utang.items.push({ id: uid(), name, amount });
-      // Update pct otomatis dari total items
+      // Hitung pct utang dari total items, lalu redistribusi kantong lain agar total 100%
       const inc = totalIncome();
       if (inc > 0) {
         const totalItems = state.utang.items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
-        state.utang.pct = Math.round((totalItems / inc) * 100);
+        const newUtangPct = Math.round((totalItems / inc) * 100);
+        redistributeForUtang(newUtangPct);
       }
       uiState.addUtangItemOpen = false;
       render(); await saveState();
@@ -3870,23 +4002,22 @@ FITUR APLIKASI YANG PERLU KAMU TAHU:
         const id = e.currentTarget.getAttribute('data-id');
         const item = (state.utang.items || []).find(it => it.id === id);
         uiState.confirmModal = {
-          message: `Hapus cicilan "${item ? item.name : ''}"? Tandai ini jika cicilan sudah lunas atau selesai.`,
+          message: `Hapus cicilan "${item ? item.name : ''}"? Tandai ini jika cicilan sudah lunas atau selesai. Persentase kantong lain akan otomatis disesuaikan kembali.`,
           confirmLabel: 'Ya, sudah lunas',
           safe: true,
           onConfirm: async () => {
             state.utang.items = (state.utang.items || []).filter(it => it.id !== id);
-            // Update pct dari sisa items
-            const inc = totalIncome();
-            if (inc > 0) {
-              const totalItems = state.utang.items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
-              state.utang.pct = Math.round((totalItems / inc) * 100);
-            } else {
-              state.utang.pct = 0;
-            }
-            // Jika tidak ada cicilan tersisa, nonaktifkan pos
             if (state.utang.items.length === 0) {
+              // Tidak ada cicilan tersisa — nonaktifkan dan kembalikan pct ke kantong lain
               state.utang.enabled = false;
+              redistributeForUtang(0);
               state.utang.pct = 0;
+            } else {
+              const inc = totalIncome();
+              if (inc > 0) {
+                const totalItems = state.utang.items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+                redistributeForUtang(Math.round((totalItems / inc) * 100));
+              }
             }
             await saveState();
           }
